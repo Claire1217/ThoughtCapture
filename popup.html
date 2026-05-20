@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 420px;
+      max-height: 520px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: #fafafa;
+      color: #1a1a2e;
+      overflow-y: auto;
+    }
+
+    .header {
+      position: sticky;
+      top: 0;
+      background: #fff;
+      padding: 14px 16px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 10;
+    }
+
+    .header h1 { font-size: 15px; font-weight: 600; }
+
+    .status {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .status.online { background: #22c55e; }
+    .status.offline { background: #ef4444; }
+
+    .content {
+      padding: 16px;
+      font-size: 13px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .content h1, .content h2, .content h3 {
+      margin-top: 12px;
+      margin-bottom: 4px;
+    }
+
+    .content h1 { font-size: 16px; }
+    .content h2 { font-size: 14px; }
+    .content h3 { font-size: 13px; color: #6366f1; }
+
+    .content blockquote {
+      border-left: 3px solid #6366f1;
+      padding-left: 10px;
+      margin: 6px 0;
+      color: #555;
+      font-style: italic;
+    }
+
+    .content hr {
+      border: none;
+      border-top: 1px solid #eee;
+      margin: 10px 0;
+    }
+
+    .content a {
+      color: #6366f1;
+      text-decoration: none;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: #aaa;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .file-path {
+      font-size: 11px;
+      color: #999;
+      padding: 0 16px 12px;
+      border-bottom: 1px solid #f0f0f2;
+    }
+
+    .error-msg {
+      text-align: center;
+      padding: 30px 20px;
+      color: #ef4444;
+      font-size: 13px;
+    }
+
+    .error-msg code {
+      display: block;
+      margin-top: 8px;
+      padding: 8px;
+      background: #fef2f2;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #991b1b;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Thought Capture <span class="status" id="status"></span></h1>
+  </div>
+  <div id="file-path" class="file-path"></div>
+  <div id="content"></div>
+  <script src="popup.js"></script>
+</body>
+</html>

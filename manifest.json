@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Thought Capture",
+  "version": "1.0",
+  "description": "Select text, capture your thoughts → Obsidian vault",
+  "permissions": ["activeTab"],
+  "host_permissions": ["http://127.0.0.1:19876/*"],
+  "commands": {
+    "capture-thought": {
+      "suggested_key": {
+        "default": "Alt+T",
+        "mac": "Alt+T"
+      },
+      "description": "Open thought capture box"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon48.png"
+  }
+}
