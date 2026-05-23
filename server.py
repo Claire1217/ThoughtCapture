@@ -37,12 +37,15 @@ LLM_MODEL = os.environ.get("LLM_MODEL", _env.get("LLM_MODEL", "deepseek-chat"))
 LLM_MODEL_FAST = os.environ.get("LLM_MODEL_FAST", _env.get("LLM_MODEL_FAST", "deepseek-chat"))
 LLM_MODEL_DEEP = os.environ.get("LLM_MODEL_DEEP", _env.get("LLM_MODEL_DEEP", "deepseek-reasoner"))
 
-vault_raw = os.environ.get("VAULT_PATH", _env.get("VAULT_PATH", "~/Documents/work/obsidian-brain"))
+STORAGE_BACKEND = os.environ.get("STORAGE_BACKEND", _env.get("STORAGE_BACKEND", "obsidian"))  # "obsidian" or "notes"
+vault_raw = os.environ.get("VAULT_PATH", _env.get("VAULT_PATH", "~/obsidian"))
 VAULT = Path(vault_raw).expanduser()
+VAULT_NAME = os.environ.get("VAULT_NAME", _env.get("VAULT_NAME", VAULT.name))
 DAILY_DIR = VAULT / "01_daily"
 PAPERS_DIR = VAULT / "30_papers"
 ATTACHMENTS_DIR = VAULT / "attachments"
-ATTACHMENTS_DIR.mkdir(parents=True, exist_ok=True)
+if STORAGE_BACKEND == "obsidian":
+    ATTACHMENTS_DIR.mkdir(parents=True, exist_ok=True)
 PORT = int(os.environ.get("PORT", _env.get("PORT", "19876")))
 
 # Color palette — matches Swift ThoughtBubbleView palette order exactly
@@ -252,16 +255,48 @@ def create_paper_stub(title, url, description, thought, selected_text):
 
 
 def append_to_daily(date_str, content):
-    """Append content to daily random thoughts file."""
-    day_dir = DAILY_DIR / date_str
-    day_dir.mkdir(parents=True, exist_ok=True)
-    daily_file = day_dir / "Daily random thoughts.md"
-    if daily_file.exists():
-        with open(daily_file, "a", encoding="utf-8") as f:
-            f.write(content)
+    """Append content to daily random thoughts file (Obsidian or Apple Notes)."""
+    if STORAGE_BACKEND == "notes":
+        append_to_apple_notes(date_str, content)
     else:
-        with open(daily_file, "w", encoding="utf-8") as f:
-            f.write(f"# Random Thoughts — {date_str}\n{content}")
+        day_dir = DAILY_DIR / date_str
+        day_dir.mkdir(parents=True, exist_ok=True)
+        daily_file = day_dir / "Daily random thoughts.md"
+        if daily_file.exists():
+            with open(daily_file, "a", encoding="utf-8") as f:
+                f.write(content)
+        else:
+            with open(daily_file, "w", encoding="utf-8") as f:
+                f.write(f"# Random Thoughts — {date_str}\n{content}")
+
+
+def append_to_apple_notes(date_str, content):
+    """Append a thought to Apple Notes. Creates a daily note if needed."""
+    import subprocess
+    note_title = f"Thoughts — {date_str}"
+    # Strip markdown callout syntax for plain text Notes
+    plain = re.sub(r'^> \[!thought-\w+\]\s*', '🔵 ', content, flags=re.MULTILINE)
+    plain = re.sub(r'^> > ', '    ', plain, flags=re.MULTILINE)
+    plain = re.sub(r'^> ', '', plain, flags=re.MULTILINE)
+    plain = plain.strip()
+
+    escaped = plain.replace('"', '\\"').replace("\n", "<br>")
+    script = f'''
+    tell application "Notes"
+        set noteFound to false
+        repeat with n in notes of default account
+            if name of n is "{note_title}" then
+                set body of n to (body of n) & "<br><br>" & "{escaped}"
+                set noteFound to true
+                exit repeat
+            end if
+        end repeat
+        if not noteFound then
+            make new note at default account with properties {{name:"{note_title}", body:"{escaped}"}}
+        end if
+    end tell
+    '''
+    subprocess.run(["osascript", "-e", script], capture_output=True, timeout=5)
 
 
 # --- Actions ---
@@ -1082,6 +1117,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
             self._json_response(200, {"status": "ok", "vault": str(VAULT)})
+        elif self.path == "/config":
+            self._json_response(200, {
+                "vaultName": VAULT_NAME,
+                "storage": STORAGE_BACKEND,
+                "hasLLM": bool(LLM_API_KEY),
+            })
         elif self.path == "/tasks":
             self._json_response(200, {"tasks": get_tasks()})
         elif self.path == "/plan":

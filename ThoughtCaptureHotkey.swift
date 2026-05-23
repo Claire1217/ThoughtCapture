@@ -47,6 +47,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenubar()
         registerHotkey()
         resultBubble = ResultBubble()
+        ResultBubble.fetchConfig()
         setupSelectionToolbar()
     }
 
@@ -1005,6 +1006,7 @@ class ResultBubble {
         dotWin.backgroundColor = .clear
         dotWin.hasShadow = false
         dotWin.isMovableByWindowBackground = true
+        dotWin.collectionBehavior = [.canJoinAllSpaces, .stationary]
 
         let bubble = ThoughtBubbleView(frame: NSMakeRect(0, 0, dotSize, dotSize))
         bubble.onEnter = { [weak self] in self?.showPopover() }
@@ -1021,6 +1023,7 @@ class ResultBubble {
         popWin.isOpaque = false
         popWin.backgroundColor = .clear
         popWin.hasShadow = true
+        popWin.collectionBehavior = [.canJoinAllSpaces, .stationary]
 
         let container = TrackView(frame: NSMakeRect(0, 0, popWidth, 100))
         container.wantsLayer = true
@@ -1043,6 +1046,8 @@ class ResultBubble {
             }
             return event
         }
+
+        dotWin.orderFront(nil)
     }
 
     // MARK: Animations
@@ -1468,22 +1473,30 @@ class ResultBubble {
 
     // MARK: Open in Obsidian
 
+    static var vaultName: String = "obsidian"
+
+    static func fetchConfig() {
+        guard let url = URL(string: "\(SERVER)/config") else { return }
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let name = json["vaultName"] as? String else { return }
+            DispatchQueue.main.async { vaultName = name }
+        }.resume()
+    }
+
     static func openInObsidian(path: String, searchText: String = "") {
         guard !path.isEmpty else { return }
         let file = path.components(separatedBy: " + ").first ?? path
         let encoded = file.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? file
-        // First open the file
-        if let url = URL(string: "obsidian://open?vault=obsidian-brain&file=\(encoded)") {
+        if let url = URL(string: "obsidian://open?vault=\(vaultName)&file=\(encoded)") {
             NSWorkspace.shared.open(url)
         }
-        // Then search within the file to scroll to the thought
         if !searchText.isEmpty {
-            // Take first 30 chars of thought as search query, enough to locate uniquely
             let query = String(searchText.prefix(30))
             let searchQuery = "path:\"\(file)\" \"\(query)\""
             if let sq = searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-               let searchUrl = URL(string: "obsidian://search?vault=obsidian-brain&query=\(sq)") {
-                // Small delay so the file opens first
+               let searchUrl = URL(string: "obsidian://search?vault=\(vaultName)&query=\(sq)") {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     NSWorkspace.shared.open(searchUrl)
                 }
