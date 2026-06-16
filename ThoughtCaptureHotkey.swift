@@ -11,6 +11,170 @@ let HOTKEY_MODIFIERS: UInt32 = UInt32(optionKey)  // Option (⌥)
 let SERVER = "http://127.0.0.1:19876"
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// MARK: - Local Storage (no server needed)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+let THOUGHT_COLORS = ["coral", "blue", "purple", "green", "amber", "olive", "pink", "steel"]
+
+class LocalStorage {
+    static let shared = LocalStorage()
+    private var colorIndex = 0
+
+    var vaultPath: String {
+        get { UserDefaults.standard.string(forKey: "vaultPath") ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: "vaultPath") }
+    }
+
+    var backend: String {
+        get { UserDefaults.standard.string(forKey: "storageBackend") ?? "obsidian" }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "storageBackend")
+            ResultBubble.storageBackend = newValue
+        }
+    }
+
+    func nextColor() -> String {
+        let c = THOUGHT_COLORS[colorIndex % THOUGHT_COLORS.count]
+        colorIndex = (colorIndex + 1) % THOUGHT_COLORS.count
+        return c
+    }
+
+    func save(thought: String, selectedText: String, appName: String,
+              browserURL: String, screenshotPath: String?) -> (ok: Bool, savedTo: String) {
+        if backend == "notes" {
+            return saveToAppleNotes(thought: thought, selectedText: selectedText, appName: appName)
+        } else {
+            return saveToObsidian(thought: thought, selectedText: selectedText,
+                                  appName: appName, browserURL: browserURL,
+                                  screenshotPath: screenshotPath)
+        }
+    }
+
+    private func saveToObsidian(thought: String, selectedText: String,
+                                appName: String, browserURL: String,
+                                screenshotPath: String?) -> (ok: Bool, savedTo: String) {
+        guard !vaultPath.isEmpty else { return (false, "") }
+        let vault = NSString(string: vaultPath).expandingTildeInPath
+        let fm = FileManager.default
+
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        let dateStr = df.string(from: Date())
+        let tf = DateFormatter()
+        tf.dateFormat = "HH:mm"
+        let timeStr = tf.string(from: Date())
+
+        let dayDir = "\(vault)/01_daily/\(dateStr)"
+        try? fm.createDirectory(atPath: dayDir, withIntermediateDirectories: true)
+
+        let filePath = "\(dayDir)/Daily random thoughts.md"
+        let savedTo = "01_daily/\(dateStr)/Daily random thoughts.md"
+
+        // Build source line
+        var source = ""
+        if !browserURL.isEmpty, !browserURL.hasPrefix("app://"),
+           let parsed = URL(string: browserURL) {
+            let host = parsed.host ?? ""
+            let path = parsed.path.count <= 40 ? parsed.path : String(parsed.path.prefix(37)) + "..."
+            source = "[\(host)\(path)](\(browserURL))"
+        }
+
+        // Screenshot
+        var screenshotFilename: String? = nil
+        if let path = screenshotPath, let data = fm.contents(atPath: path) {
+            let ts = DateFormatter()
+            ts.dateFormat = "yyyyMMdd_HHmmss"
+            screenshotFilename = "tc_\(ts.string(from: Date())).png"
+            let attachDir = "\(vault)/attachments"
+            try? fm.createDirectory(atPath: attachDir, withIntermediateDirectories: true)
+            fm.createFile(atPath: "\(attachDir)/\(screenshotFilename!)", contents: data)
+            try? fm.removeItem(atPath: path)
+        }
+
+        let color = nextColor()
+        var lines = [String]()
+        lines.append("")
+        lines.append("> [!thought-\(color)] \(timeStr)")
+        lines.append("> \(thought)")
+        if let sf = screenshotFilename {
+            lines.append("> ![[\(sf)]]")
+        }
+        if !selectedText.isEmpty {
+            var safe = selectedText
+            // Sanitize content that breaks Obsidian callout nesting
+            safe = safe.replacingOccurrences(of: "```", with: "` ` `")
+            let quoted = safe.components(separatedBy: "\n").joined(separator: "\n> > ")
+            let sourceTag = !source.isEmpty ? " 【\(source)】" : (!appName.isEmpty ? " 【\(appName)】" : "")
+            lines.append("> > \(quoted)\(sourceTag)")
+        } else if !source.isEmpty {
+            lines.append("> \(source)")
+        }
+        lines.append("")
+
+        let entry = lines.joined(separator: "\n")
+
+        if fm.fileExists(atPath: filePath) {
+            if let fh = FileHandle(forWritingAtPath: filePath) {
+                fh.seekToEndOfFile()
+                fh.write(entry.data(using: .utf8)!)
+                fh.closeFile()
+            }
+        } else {
+            let header = "# Random Thoughts — \(dateStr)\n"
+            try? (header + entry).write(toFile: filePath, atomically: true, encoding: .utf8)
+        }
+
+        return (true, savedTo)
+    }
+
+    private func saveToAppleNotes(thought: String, selectedText: String,
+                                  appName: String) -> (ok: Bool, savedTo: String) {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        let dateStr = df.string(from: Date())
+        let tf = DateFormatter()
+        tf.dateFormat = "HH:mm"
+        let timeStr = tf.string(from: Date())
+        let noteTitle = "Thoughts — \(dateStr)"
+
+        var body = "🔵 \(timeStr)<br>\(thought)"
+        if !selectedText.isEmpty {
+            let sourceTag = !appName.isEmpty ? " <span style=\"font-style:normal;font-size:0.8em\">— \(appName)</span>" : ""
+            body += "<br><span style=\"font-style:italic;color:#8e8e93\">\(selectedText)\(sourceTag)</span>"
+        }
+        let escaped = body.replacingOccurrences(of: "\"", with: "\\\"")
+                          .replacingOccurrences(of: "\n", with: "<br>")
+
+        let script = """
+        tell application "Notes"
+            set noteFound to false
+            repeat with n in notes of default account
+                if name of n is "\(noteTitle)" then
+                    set body of n to (body of n) & "<br><br>" & "\(escaped)"
+                    set noteFound to true
+                    exit repeat
+                end if
+            end repeat
+            if not noteFound then
+                make new note at default account with properties {name:"\(noteTitle)", body:"\(escaped)"}
+            end if
+        end tell
+        """
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        proc.arguments = ["-e", script]
+        do {
+            try proc.run()
+            proc.waitUntilExit()
+            return (proc.terminationStatus == 0, noteTitle)
+        } catch {
+            fputs("[TC] Apple Notes error: \(error)\n", stderr)
+            return (false, "")
+        }
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MARK: - Design Tokens
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -47,7 +211,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenubar()
         registerHotkey()
         resultBubble = ResultBubble()
-        ResultBubble.fetchConfig()
+        ResultBubble.fetchConfig(sync: true)
         setupSelectionToolbar()
     }
 
@@ -394,8 +558,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         self?.resultBubble?.addItem(text: thought, savedTo: savedTo, ok: true)
                     }
                 } else {
+                    // Server unreachable — save locally
+                    fputs("[TC] server down, saving locally\n", stderr)
+                    let result = LocalStorage.shared.save(
+                        thought: thought, selectedText: selectedText,
+                        appName: appName, browserURL: browserURL,
+                        screenshotPath: screenshotPath)
                     self?.capturePanel?.close()
-                    self?.resultBubble?.addItem(text: thought, savedTo: "", ok: false)
+                    self?.resultBubble?.addItem(text: thought, savedTo: result.savedTo, ok: result.ok)
                 }
             }
         }.resume()
@@ -1005,12 +1175,14 @@ class ResultBubble {
         dotWin.isOpaque = false
         dotWin.backgroundColor = .clear
         dotWin.hasShadow = false
-        dotWin.isMovableByWindowBackground = true
+        dotWin.isMovableByWindowBackground = false
         dotWin.collectionBehavior = [.canJoinAllSpaces, .stationary]
 
         let bubble = ThoughtBubbleView(frame: NSMakeRect(0, 0, dotSize, dotSize))
         bubble.onEnter = { [weak self] in self?.showPopover() }
         bubble.onExit  = { [weak self] in self?.scheduleDismiss() }
+        bubble.onLeftClick = { [weak self] in self?.togglePopover() }
+        bubble.onSettings = { [weak self] in self?.openSettingsWindow() }
         dotWin.contentView = bubble
 
         // Gentle floating animation
@@ -1087,7 +1259,6 @@ class ResultBubble {
     private func showPopover() {
         cancelDismiss()
         fetchPlan()  // async — will rebuild when data arrives
-        guard !items.isEmpty || !planItems.isEmpty else { return }
         rebuildPopover()
         positionPopover()
 
@@ -1130,6 +1301,466 @@ class ResultBubble {
     private func cancelDismiss() {
         hideTimer?.invalidate()
         hideTimer = nil
+    }
+
+    private func togglePopover() {
+        if popWin.isVisible {
+            dotWin.removeChildWindow(popWin)
+            popWin.orderOut(nil)
+        } else {
+            showPopover()
+        }
+    }
+
+    // MARK: Settings Window
+
+    private var settingsWin: NSWindow?
+    // Keep action targets alive
+    private var settingsTargets: [AnyObject] = []
+
+    func openSettingsWindow() {
+        if let existing = settingsWin, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        settingsTargets.removeAll()
+
+        let W: CGFloat = 380, H: CGFloat = 440
+        let win = NSWindow(contentRect: NSMakeRect(0, 0, W, H),
+                           styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        win.title = "ThoughtCapture Settings"
+        win.center()
+        win.isReleasedWhenClosed = false
+
+        let root = NSView(frame: NSMakeRect(0, 0, W, H))
+        root.wantsLayer = true
+        root.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        let px: CGFloat = 24
+        let fw: CGFloat = W - px * 2
+        var y: CGFloat = H - 24
+
+        // ── Helpers ──
+        func label(_ text: String, at yy: inout CGFloat, size: CGFloat = 11, color: NSColor = .secondaryLabelColor) {
+            let l = NSTextField(labelWithString: text)
+            l.font = .systemFont(ofSize: size)
+            l.textColor = color
+            l.frame = NSMakeRect(px, yy - 14, fw, 14)
+            root.addSubview(l)
+            yy -= 18
+        }
+
+        func sep(at yy: inout CGFloat) {
+            let s = NSView(frame: NSMakeRect(px, yy - 8, fw, 1))
+            s.wantsLayer = true
+            s.layer?.backgroundColor = NSColor.separatorColor.cgColor
+            root.addSubview(s)
+            yy -= 20
+        }
+
+        // ━━━  Storage  ━━━
+        label("SAVE TO", at: &y, size: 11, color: .tertiaryLabelColor)
+
+        let storageSeg = NSSegmentedControl(labels: ["Obsidian Vault", "Apple Notes"], trackingMode: .selectOne, target: nil, action: nil)
+        storageSeg.selectedSegment = 0
+        storageSeg.frame = NSMakeRect(px, y - 24, fw, 24)
+        storageSeg.identifier = NSUserInterfaceItemIdentifier("storage")
+        root.addSubview(storageSeg)
+        y -= 36
+
+        // Vault folder
+        let vaultRow = NSView(frame: NSMakeRect(px, y - 26, fw, 26))
+        vaultRow.identifier = NSUserInterfaceItemIdentifier("vaultRow")
+        root.addSubview(vaultRow)
+
+        let vpField = NSTextField(frame: NSMakeRect(0, 2, fw - 66, 22))
+        vpField.placeholderString = "~/obsidian"
+        vpField.font = .systemFont(ofSize: 12)
+        vpField.identifier = NSUserInterfaceItemIdentifier("vaultPath")
+        vpField.bezelStyle = .roundedBezel
+        vaultRow.addSubview(vpField)
+
+        let browseBtn = NSButton(title: "Choose…", target: nil, action: nil)
+        browseBtn.bezelStyle = .rounded
+        browseBtn.controlSize = .small
+        browseBtn.font = .systemFont(ofSize: 11)
+        browseBtn.frame = NSMakeRect(fw - 62, 1, 62, 22)
+        vaultRow.addSubview(browseBtn)
+        y -= 36
+
+        class BrowseHandler: NSObject {
+            weak var pathField: NSTextField?
+            @objc func pick(_ sender: Any) {
+                let panel = NSOpenPanel()
+                panel.canChooseFiles = false
+                panel.canChooseDirectories = true
+                panel.allowsMultipleSelection = false
+                panel.prompt = "Choose Vault"
+                if panel.runModal() == .OK, let url = panel.url {
+                    pathField?.stringValue = url.path
+                }
+            }
+        }
+        let browseHandler = BrowseHandler()
+        browseHandler.pathField = vpField
+        browseBtn.target = browseHandler
+        browseBtn.action = #selector(BrowseHandler.pick(_:))
+        settingsTargets.append(browseHandler)
+
+        class StorageToggle: NSObject {
+            weak var vaultRow: NSView?
+            @objc func changed(_ sender: NSSegmentedControl) {
+                vaultRow?.isHidden = sender.selectedSegment != 0
+                if sender.selectedSegment == 1 {
+                    // Trigger Automation permission for Notes on first switch
+                    DispatchQueue.global().async {
+                        let proc = Process()
+                        proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+                        proc.arguments = ["-e", "tell application \"Notes\" to get name of first note of default account"]
+                        try? proc.run()
+                        proc.waitUntilExit()
+                    }
+                }
+            }
+        }
+        let storageToggle = StorageToggle()
+        storageToggle.vaultRow = vaultRow
+        storageSeg.target = storageToggle
+        storageSeg.action = #selector(StorageToggle.changed(_:))
+        settingsTargets.append(storageToggle)
+
+        sep(at: &y)
+
+        // ━━━  AI  ━━━
+        label("AI ASSISTANT  ·  type / to ask questions", at: &y, size: 11, color: .tertiaryLabelColor)
+
+        // Provider
+        label("Provider", at: &y)
+        let providerSeg = NSSegmentedControl(labels: ["DeepSeek", "OpenAI", "Custom"], trackingMode: .selectOne, target: nil, action: nil)
+        providerSeg.selectedSegment = 0
+        providerSeg.frame = NSMakeRect(px, y - 24, fw, 24)
+        providerSeg.identifier = NSUserInterfaceItemIdentifier("provider")
+        root.addSubview(providerSeg)
+        y -= 36
+
+        // API Key
+        label("API Key", at: &y)
+        let keyField = NSSecureTextField(frame: NSMakeRect(px, y - 22, fw, 22))
+        keyField.placeholderString = "sk-..."
+        keyField.font = .systemFont(ofSize: 12)
+        keyField.identifier = NSUserInterfaceItemIdentifier("llmApiKey")
+        root.addSubview(keyField)
+        y -= 28
+
+        let testStatus = NSTextField(labelWithString: "")
+        testStatus.font = .systemFont(ofSize: 10)
+        testStatus.textColor = .systemGreen
+        testStatus.frame = NSMakeRect(px, y - 14, fw, 14)
+        testStatus.identifier = NSUserInterfaceItemIdentifier("testStatus")
+        root.addSubview(testStatus)
+        y -= 22
+
+        // Custom (hidden)
+        let customRow = NSView(frame: NSMakeRect(px, y - 100, fw, 100))
+        customRow.identifier = NSUserInterfaceItemIdentifier("customRow")
+        customRow.isHidden = true
+        root.addSubview(customRow)
+
+        let elabel = NSTextField(labelWithString: "Endpoint")
+        elabel.font = .systemFont(ofSize: 11)
+        elabel.textColor = .secondaryLabelColor
+        elabel.frame = NSMakeRect(0, 82, fw, 14)
+        customRow.addSubview(elabel)
+
+        let baseField = NSTextField(frame: NSMakeRect(0, 56, fw, 22))
+        baseField.placeholderString = "https://api.example.com/chat/completions"
+        baseField.font = .systemFont(ofSize: 11)
+        baseField.identifier = NSUserInterfaceItemIdentifier("llmApiBase")
+        baseField.bezelStyle = .roundedBezel
+        customRow.addSubview(baseField)
+
+        let mlabel = NSTextField(labelWithString: "Model")
+        mlabel.font = .systemFont(ofSize: 11)
+        mlabel.textColor = .secondaryLabelColor
+        mlabel.frame = NSMakeRect(0, 36, fw, 14)
+        customRow.addSubview(mlabel)
+
+        let modelField = NSTextField(frame: NSMakeRect(0, 10, fw, 22))
+        modelField.placeholderString = "model-name"
+        modelField.font = .systemFont(ofSize: 11)
+        modelField.identifier = NSUserInterfaceItemIdentifier("llmModel")
+        modelField.bezelStyle = .roundedBezel
+        customRow.addSubview(modelField)
+
+        class ProviderToggle: NSObject {
+            weak var customRow: NSView?
+            weak var baseField: NSTextField?
+            weak var modelField: NSTextField?
+            @objc func changed(_ sender: NSSegmentedControl) {
+                let idx = sender.selectedSegment
+                customRow?.isHidden = idx != 2
+                if idx == 0 {
+                    baseField?.stringValue = "https://api.deepseek.com/chat/completions"
+                    modelField?.stringValue = "deepseek-chat"
+                } else if idx == 1 {
+                    baseField?.stringValue = "https://api.openai.com/v1/chat/completions"
+                    modelField?.stringValue = "gpt-4o-mini"
+                }
+            }
+        }
+        let providerToggle = ProviderToggle()
+        providerToggle.customRow = customRow
+        providerToggle.baseField = baseField
+        providerToggle.modelField = modelField
+        providerSeg.target = providerToggle
+        providerSeg.action = #selector(ProviderToggle.changed(_:))
+        settingsTargets.append(providerToggle)
+
+        // ━━━  Bottom  ━━━
+        let testBtn = NSButton(title: "Test Connection", target: nil, action: nil)
+        testBtn.bezelStyle = .rounded
+        testBtn.controlSize = .small
+        testBtn.font = .systemFont(ofSize: 11)
+        testBtn.frame = NSMakeRect(px, 14, 116, 22)
+        root.addSubview(testBtn)
+
+        let statusLabel = NSTextField(labelWithString: "")
+        statusLabel.font = .systemFont(ofSize: 11)
+        statusLabel.textColor = .systemGreen
+        statusLabel.frame = NSMakeRect(px + 122, 17, 100, 14)
+        statusLabel.identifier = NSUserInterfaceItemIdentifier("status")
+        root.addSubview(statusLabel)
+
+        let saveBtn = NSButton(title: "Save", target: nil, action: nil)
+        saveBtn.bezelStyle = .rounded
+        saveBtn.frame = NSMakeRect(W - px - 70, 12, 70, 26)
+        saveBtn.keyEquivalent = "\r"
+        root.addSubview(saveBtn)
+
+        win.contentView = root
+
+        // ── Wire up actions ──
+
+        // Save
+        class SaveHandler: NSObject {
+            weak var root: NSView?
+            @objc func save(_ sender: Any) {
+                guard let root = root else { return }
+
+                func textField(in view: NSView, id: String) -> NSTextField? {
+                    for sub in view.subviews {
+                        if let tf = sub as? NSTextField, tf.identifier?.rawValue == id { return tf }
+                        if let found = textField(in: sub, id: id) { return found }
+                    }
+                    return nil
+                }
+                func segValue(in view: NSView, id: String) -> Int {
+                    for sub in view.subviews {
+                        if let seg = sub as? NSSegmentedControl, seg.identifier?.rawValue == id { return seg.selectedSegment }
+                        let found = segValue(in: sub, id: id)
+                        if found >= 0 { return found }
+                    }
+                    return -1
+                }
+                func secureValue(in view: NSView, id: String) -> String {
+                    for sub in view.subviews {
+                        if let sf = sub as? NSSecureTextField, sf.identifier?.rawValue == id { return sf.stringValue }
+                        let v = secureValue(in: sub, id: id)
+                        if !v.isEmpty { return v }
+                    }
+                    return ""
+                }
+
+                let isObsidian = segValue(in: root, id: "storage") == 0
+                let vaultPath = textField(in: root, id: "vaultPath")?.stringValue ?? ""
+                let vaultName = URL(fileURLWithPath: vaultPath).lastPathComponent
+                let apiBase = textField(in: root, id: "llmApiBase")?.stringValue ?? ""
+                let model = textField(in: root, id: "llmModel")?.stringValue ?? ""
+                let apiKey = secureValue(in: root, id: "llmApiKey")
+                let backend = isObsidian ? "obsidian" : "notes"
+
+                // Always save to UserDefaults (works without server)
+                LocalStorage.shared.vaultPath = vaultPath
+                LocalStorage.shared.backend = backend
+                if !vaultName.isEmpty {
+                    ResultBubble.vaultName = vaultName
+                    UserDefaults.standard.set(vaultName, forKey: "vaultName")
+                }
+
+                let status = textField(in: root, id: "status")
+
+                // Also sync to server if running (for LLM features)
+                var payload: [String: Any] = [
+                    "storage": backend,
+                    "vaultPath": vaultPath,
+                    "vaultName": vaultName,
+                    "llmApiBase": apiBase,
+                    "llmModel": model,
+                ]
+                if !apiKey.isEmpty { payload["llmApiKey"] = apiKey }
+
+                guard let url = URL(string: "\(SERVER)/config") else {
+                    status?.textColor = .systemGreen
+                    status?.stringValue = "✓ Saved"
+                    return
+                }
+                var req = URLRequest(url: url)
+                req.httpMethod = "POST"
+                req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+                req.timeoutInterval = 2
+
+                status?.stringValue = "Saving…"
+                status?.textColor = .secondaryLabelColor
+
+                URLSession.shared.dataTask(with: req) { data, _, err in
+                    DispatchQueue.main.async {
+                        status?.textColor = .systemGreen
+                        status?.stringValue = err != nil ? "✓ Saved (AI offline)" : "✓ Saved"
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            status?.stringValue = ""
+                        }
+                    }
+                }.resume()
+            }
+        }
+        let saveHandler = SaveHandler()
+        saveHandler.root = root
+        saveBtn.target = saveHandler
+        saveBtn.action = #selector(SaveHandler.save(_:))
+        settingsTargets.append(saveHandler)
+
+        // Test connection
+        class TestHandler: NSObject {
+            weak var root: NSView?
+            @objc func test(_ sender: Any) {
+                guard let root = root else { return }
+                func textField(in view: NSView, id: String) -> NSTextField? {
+                    for sub in view.subviews {
+                        if let tf = sub as? NSTextField, tf.identifier?.rawValue == id { return tf }
+                        if let found = textField(in: sub, id: id) { return found }
+                    }
+                    return nil
+                }
+                func secureValue(in view: NSView, id: String) -> String {
+                    for sub in view.subviews {
+                        if let sf = sub as? NSSecureTextField, sf.identifier?.rawValue == id { return sf.stringValue }
+                        let v = secureValue(in: sub, id: id)
+                        if !v.isEmpty { return v }
+                    }
+                    return ""
+                }
+
+                let apiBase = textField(in: root, id: "llmApiBase")?.stringValue ?? ""
+                let model = textField(in: root, id: "llmModel")?.stringValue ?? ""
+                let apiKey = secureValue(in: root, id: "llmApiKey")
+                let statusLabel = textField(in: root, id: "testStatus")
+
+                statusLabel?.textColor = .secondaryLabelColor
+                statusLabel?.stringValue = "Testing…"
+
+                var payload: [String: Any] = ["apiBase": apiBase, "model": model]
+                if !apiKey.isEmpty { payload["apiKey"] = apiKey }
+
+                guard let url = URL(string: "\(SERVER)/config/test-llm") else { return }
+                var req = URLRequest(url: url)
+                req.httpMethod = "POST"
+                req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+                URLSession.shared.dataTask(with: req) { data, _, err in
+                    DispatchQueue.main.async {
+                        if let err = err {
+                            statusLabel?.textColor = .systemRed
+                            statusLabel?.stringValue = "Error: \(err.localizedDescription)"
+                            return
+                        }
+                        guard let data = data,
+                              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                            statusLabel?.textColor = .systemRed
+                            statusLabel?.stringValue = "Invalid response"
+                            return
+                        }
+                        if json["ok"] as? Bool == true {
+                            statusLabel?.textColor = .systemGreen
+                            statusLabel?.stringValue = "✓ Connected"
+                        } else {
+                            statusLabel?.textColor = .systemRed
+                            let errMsg = json["error"] as? String ?? "Unknown error"
+                            statusLabel?.stringValue = errMsg.prefix(60).description
+                        }
+                    }
+                }.resume()
+            }
+        }
+        let testHandler = TestHandler()
+        testHandler.root = root
+        testBtn.target = testHandler
+        testBtn.action = #selector(TestHandler.test(_:))
+        settingsTargets.append(testHandler)
+
+        // ── Load current values from server ──
+        loadSettings(root: root, storageSeg: storageSeg,
+                     providerSeg: providerSeg, vaultRow: vaultRow, customRow: customRow)
+
+        settingsWin = win
+        win.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func loadSettings(root: NSView,
+                              storageSeg: NSSegmentedControl, providerSeg: NSSegmentedControl,
+                              vaultRow: NSView, customRow: NSView) {
+        func textField(in view: NSView, id: String) -> NSTextField? {
+            for sub in view.subviews {
+                if let tf = sub as? NSTextField, tf.identifier?.rawValue == id { return tf }
+                if let found = textField(in: sub, id: id) { return found }
+            }
+            return nil
+        }
+
+        // Load from UserDefaults first (always available)
+        let storage = LocalStorage.shared.backend
+        storageSeg.selectedSegment = storage == "notes" ? 1 : 0
+        vaultRow.isHidden = storage == "notes"
+        let savedVaultPath = LocalStorage.shared.vaultPath
+        if !savedVaultPath.isEmpty {
+            textField(in: root, id: "vaultPath")?.stringValue = savedVaultPath
+        }
+
+        // Try to load LLM settings from server (optional)
+        guard let url = URL(string: "\(SERVER)/config") else { return }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 2
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+            DispatchQueue.main.async {
+
+                // LLM provider detection
+                let apiBase = json["llmApiBase"] as? String ?? ""
+                let model = json["llmModel"] as? String ?? ""
+                textField(in: root, id: "llmApiBase")?.stringValue = apiBase
+                textField(in: root, id: "llmModel")?.stringValue = model
+
+                if apiBase.contains("deepseek") {
+                    providerSeg.selectedSegment = 0
+                    customRow.isHidden = true
+                } else if apiBase.contains("openai") {
+                    providerSeg.selectedSegment = 1
+                    customRow.isHidden = true
+                } else {
+                    providerSeg.selectedSegment = 2
+                    customRow.isHidden = false
+                }
+
+                // API key status
+                let hasLLM = json["hasLLM"] as? Bool ?? false
+                if hasLLM {
+                    textField(in: root, id: "testStatus")?.stringValue = "Key configured ✓"
+                    textField(in: root, id: "testStatus")?.textColor = .systemGreen
+                }
+            }
+        }.resume()
     }
 
     // MARK: Data
@@ -1237,10 +1868,24 @@ class ResultBubble {
         let visibleThoughts = items
         let planCount = min(visiblePlans.count, 6)
         let thoughtCount = min(visibleThoughts.count, 8)
+        let hasWorking = workingTask != nil
+
+        // Empty state
+        if planCount == 0 && thoughtCount == 0 && !hasWorking {
+            let emptyH: CGFloat = 64
+            container.frame = NSMakeRect(0, 0, popWidth, emptyH)
+            let hint = NSTextField(labelWithString: "Press ⌥T to capture a thought")
+            hint.font = rounded(size: 12)
+            hint.textColor = TC.muted
+            hint.alignment = .center
+            hint.frame = NSMakeRect(10, (emptyH - 16) / 2, popWidth - 20, 16)
+            container.addSubview(hint)
+            popWin.setContentSize(NSSize(width: popWidth, height: emptyH))
+            return
+        }
 
         // Calculate total height
         var totalH = pad
-        let hasWorking = workingTask != nil
         if hasWorking { totalH += 24 }
         if planCount > 0 {
             totalH += 18
@@ -1278,7 +1923,7 @@ class ResultBubble {
             y -= 16
             let headerRow = ClickableRow(frame: NSMakeRect(4, y, popWidth - 8, 16))
             let planPath = planFilePath
-            headerRow.onClick = { ResultBubble.openInObsidian(path: planPath) }
+            headerRow.onClick = { ResultBubble.openSavedThought(path: planPath) }
             let header = NSTextField(labelWithString: "TODAY'S PLAN  ↗")
             header.font = rounded(size: 9, weight: .medium)
             header.textColor = TC.muted
@@ -1373,7 +2018,7 @@ class ResultBubble {
                 let row = ClickableRow(frame: NSMakeRect(4, y, popWidth - 8, rowH))
                 let path = item.savedTo
                 let text = item.text
-                row.onClick = { ResultBubble.openInObsidian(path: path, searchText: text) }
+                row.onClick = { ResultBubble.openSavedThought(path: path, searchText: text) }
                 row.wantsLayer = true
                 row.layer?.cornerRadius = 6
 
@@ -1473,16 +2118,41 @@ class ResultBubble {
 
     // MARK: Open in Obsidian
 
-    static var vaultName: String = "obsidian"
+    static var vaultName: String = {
+        UserDefaults.standard.string(forKey: "vaultName") ?? "obsidian"
+    }()
 
-    static func fetchConfig() {
+    static var storageBackend: String = {
+        UserDefaults.standard.string(forKey: "storageBackend") ?? "obsidian"
+    }()
+
+    /// Fetch config from server. When `sync` is true (used at launch),
+    /// blocks up to 2 seconds so vaultName is ready before any UI.
+    static func fetchConfig(sync: Bool = false) {
         guard let url = URL(string: "\(SERVER)/config") else { return }
+        let sem = sync ? DispatchSemaphore(value: 0) : nil
         URLSession.shared.dataTask(with: url) { data, _, _ in
+            defer { sem?.signal() }
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let name = json["vaultName"] as? String else { return }
-            DispatchQueue.main.async { vaultName = name }
+            vaultName = name
+            UserDefaults.standard.set(name, forKey: "vaultName")
+            if let backend = json["storage"] as? String {
+                storageBackend = backend
+                UserDefaults.standard.set(backend, forKey: "storageBackend")
+            }
         }.resume()
+        if sync { _ = sem?.wait(timeout: .now() + 2) }
+    }
+
+    /// Open a saved thought — dispatches to Obsidian or Apple Notes based on backend.
+    static func openSavedThought(path: String, searchText: String = "") {
+        if storageBackend == "notes" {
+            openInNotes(searchText: searchText)
+        } else {
+            openInObsidian(path: path, searchText: searchText)
+        }
     }
 
     static func openInObsidian(path: String, searchText: String = "") {
@@ -1501,6 +2171,31 @@ class ResultBubble {
                     NSWorkspace.shared.open(searchUrl)
                 }
             }
+        }
+    }
+
+    static func openInNotes(searchText: String = "") {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        let dateStr = f.string(from: Date())
+        let noteTitle = "Thoughts — \(dateStr)"
+        let script = """
+        tell application "Notes"
+            activate
+            set noteFound to false
+            repeat with n in notes of default account
+                if name of n is "\(noteTitle)" then
+                    show n
+                    set noteFound to true
+                    exit repeat
+                end if
+            end repeat
+        end tell
+        """
+        DispatchQueue.global().async {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            proc.arguments = ["-e", script]
+            try? proc.run()
         }
     }
 }
@@ -1556,13 +2251,50 @@ class TrackView: NSView {
 
 /// Simple gradient circle with soft breathing pulse.
 class ThoughtBubbleView: TrackView {
+    var onLeftClick: (() -> Void)?
+    var onSettings: (() -> Void)?
+    private var dragOrigin: NSPoint?
+    private var isDragging = false
+
+    override func mouseDown(with event: NSEvent) {
+        dragOrigin = event.locationInWindow
+        isDragging = false
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let origin = dragOrigin else { return }
+        let loc = event.locationInWindow
+        let dx = abs(loc.x - origin.x), dy = abs(loc.y - origin.y)
+        if dx > 3 || dy > 3 { isDragging = true }
+        if isDragging, let win = window {
+            var frame = win.frame
+            frame.origin.x += event.deltaX
+            frame.origin.y -= event.deltaY
+            win.setFrameOrigin(frame.origin)
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        if !isDragging { onLeftClick?() }
+        dragOrigin = nil
+        isDragging = false
+    }
+
     override func rightMouseDown(with event: NSEvent) {
         let menu = NSMenu()
+        let settingsItem = NSMenuItem(title: "Settings…",
+                                       action: #selector(openSettings),
+                                       keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit ThoughtCapture",
                                 action: #selector(NSApplication.terminate(_:)),
                                 keyEquivalent: ""))
         NSMenu.popUpContextMenu(menu, with: event, for: self)
     }
+
+    @objc func openSettings() { onSettings?() }
 
     private var circle: CAGradientLayer!
     var colorIdx = 0
@@ -1622,7 +2354,7 @@ class ThoughtBubbleView: TrackView {
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    override var mouseDownCanMoveWindow: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false }
 
     func intensify() {
         colorIndex = (colorIndex + 1) % palette.count
@@ -1829,6 +2561,21 @@ if running.contains(where: { $0.processIdentifier != myPID }) {
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
+
+// Add standard Edit menu so Cmd+V / Cmd+C / Cmd+A work in text fields (e.g. Settings)
+let mainMenu = NSMenu()
+let editMenuItem = NSMenuItem()
+editMenuItem.submenu = {
+    let m = NSMenu(title: "Edit")
+    m.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+    m.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+    m.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+    m.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+    return m
+}()
+mainMenu.addItem(editMenuItem)
+app.mainMenu = mainMenu
+
 let delegate = AppDelegate()
 app.delegate = delegate
 app.run()

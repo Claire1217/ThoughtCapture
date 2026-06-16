@@ -276,7 +276,10 @@ def append_to_apple_notes(date_str, content):
     note_title = f"Thoughts — {date_str}"
     # Strip markdown callout syntax for plain text Notes
     plain = re.sub(r'^> \[!thought-\w+\]\s*', '🔵 ', content, flags=re.MULTILINE)
-    plain = re.sub(r'^> > ', '    ', plain, flags=re.MULTILINE)
+    def quote_to_html(m):
+        text = m.group(1)
+        return f'<span style="font-style:italic;color:#8e8e93">{text}</span>'
+    plain = re.sub(r'^> > (.*)', quote_to_html, plain, flags=re.MULTILINE)
     plain = re.sub(r'^> ', '', plain, flags=re.MULTILINE)
     plain = plain.strip()
 
@@ -357,8 +360,6 @@ def action_thought(data):
     entry_lines = [""]
     entry_lines.append(f"> [!thought-{color_name}] {time_str}")
     entry_lines.append(f"> {thought}")
-    if source:
-        entry_lines.append(f"> {source}")
     if screenshot_filename:
         entry_lines.append(f"> ![[{screenshot_filename}]]")
     if selected_text:
@@ -369,7 +370,10 @@ def action_thought(data):
         safe = re.sub(r'[═─━]{5,}', '———', safe)  # inline long lines
         safe = safe.replace('```', '` ` `')
         quote_text = safe.replace("\n", "\n> > ")
-        entry_lines.append(f"> > {quote_text}")
+        source_tag = f" 【{source or app_name}】" if (source or app_name) else ""
+        entry_lines.append(f"> > {quote_text}{source_tag}")
+    elif source:
+        entry_lines.append(f"> {source}")
     entry_lines.append("")
 
     append_to_daily(date_str, "\n".join(entry_lines))
@@ -1111,6 +1115,10 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/plan/toggle":
             result = toggle_plan_item(body.get("index", -1))
             self._json_response(200, result)
+        elif self.path == "/config":
+            self._save_config(body)
+        elif self.path == "/config/test-llm":
+            self._test_llm(body)
         else:
             self._json_response(404, {"error": "not found"})
 
@@ -1120,8 +1128,11 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/config":
             self._json_response(200, {
                 "vaultName": VAULT_NAME,
+                "vaultPath": str(VAULT),
                 "storage": STORAGE_BACKEND,
                 "hasLLM": bool(LLM_API_KEY),
+                "llmApiBase": LLM_API_BASE,
+                "llmModel": LLM_MODEL,
             })
         elif self.path == "/tasks":
             self._json_response(200, {"tasks": get_tasks()})
@@ -1129,6 +1140,87 @@ class Handler(BaseHTTPRequestHandler):
             self._json_response(200, get_today_plan())
         else:
             self._json_response(404, {"error": "not found"})
+
+    def _save_config(self, body):
+        """Write settings to .env and update globals (requires server restart for full effect)."""
+        global STORAGE_BACKEND, VAULT, VAULT_NAME, DAILY_DIR, PAPERS_DIR, ATTACHMENTS_DIR
+        global LLM_API_KEY, LLM_API_BASE, LLM_MODEL
+
+        key_map = {
+            "storage": "STORAGE_BACKEND",
+            "vaultPath": "VAULT_PATH",
+            "vaultName": "VAULT_NAME",
+            "llmApiKey": "LLM_API_KEY",
+            "llmApiBase": "LLM_API_BASE",
+            "llmModel": "LLM_MODEL",
+        }
+
+        # Read existing .env lines (preserve comments and unknown keys)
+        env_lines = []
+        existing_keys = set()
+        if ENV_FILE.exists():
+            for line in ENV_FILE.read_text().splitlines():
+                stripped = line.strip()
+                if stripped and not stripped.startswith("#") and "=" in stripped:
+                    k = stripped.split("=", 1)[0].strip()
+                    if k in key_map.values():
+                        existing_keys.add(k)
+                        # Will be rewritten below
+                        continue
+                env_lines.append(line)
+
+        # Build new key=value pairs
+        for json_key, env_key in key_map.items():
+            if json_key in body:
+                val = str(body[json_key])
+                env_lines.append(f"{env_key}={val}")
+                existing_keys.add(env_key)
+            elif env_key in _env:
+                # Keep existing value
+                env_lines.append(f"{env_key}={_env[env_key]}")
+
+        ENV_FILE.write_text("\n".join(env_lines) + "\n")
+
+        # Update live globals
+        if "storage" in body:
+            STORAGE_BACKEND = body["storage"]
+        if "vaultPath" in body:
+            VAULT = Path(body["vaultPath"]).expanduser()
+            DAILY_DIR = VAULT / "01_daily"
+            PAPERS_DIR = VAULT / "30_papers"
+            ATTACHMENTS_DIR = VAULT / "attachments"
+            if STORAGE_BACKEND == "obsidian":
+                ATTACHMENTS_DIR.mkdir(parents=True, exist_ok=True)
+        if "vaultName" in body:
+            VAULT_NAME = body["vaultName"]
+        if "llmApiKey" in body:
+            LLM_API_KEY = body["llmApiKey"]
+        if "llmApiBase" in body:
+            LLM_API_BASE = body["llmApiBase"]
+        if "llmModel" in body:
+            LLM_MODEL = body["llmModel"]
+
+        self._json_response(200, {"ok": True, "vaultName": VAULT_NAME, "storage": STORAGE_BACKEND})
+
+    def _test_llm(self, body):
+        """Quick LLM connectivity test — send a tiny prompt and check for a response."""
+        api_key = body.get("apiKey", LLM_API_KEY)
+        api_base = body.get("apiBase", LLM_API_BASE)
+        model = body.get("model", LLM_MODEL)
+        if not api_key:
+            self._json_response(400, {"ok": False, "error": "No API key"})
+            return
+        try:
+            payload = json.dumps({"model": model, "messages": [{"role": "user", "content": "Say hi"}], "max_tokens": 5}).encode()
+            req = Request(api_base, data=payload, method="POST")
+            req.add_header("Content-Type", "application/json")
+            req.add_header("Authorization", f"Bearer {api_key}")
+            with urlopen(req, timeout=10) as resp:
+                result = json.loads(resp.read())
+                reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                self._json_response(200, {"ok": True, "reply": reply})
+        except Exception as e:
+            self._json_response(200, {"ok": False, "error": str(e)[:200]})
 
     def route(self, data):
         input_text = data.get("input", "")
