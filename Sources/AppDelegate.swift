@@ -124,18 +124,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let captureKey = UserDefaults.standard.object(forKey: "hotkeyCapture") as? UInt32 ?? HOTKEY_KEYCODE
+        let captureMods = UserDefaults.standard.object(forKey: "hotkeyCaptureMods") as? UInt32 ?? HOTKEY_MODIFIERS
         let screenshotKey = UserDefaults.standard.object(forKey: "hotkeyScreenshot") as? UInt32 ?? HOTKEY_SCREENSHOT
+        let screenshotMods = UserDefaults.standard.object(forKey: "hotkeyScreenshotMods") as? UInt32 ?? HOTKEY_MODIFIERS
 
         var hotKeyID1 = EventHotKeyID()
         hotKeyID1.signature = OSType(0x54435F48)
         hotKeyID1.id = 1
-        RegisterEventHotKey(captureKey, HOTKEY_MODIFIERS, hotKeyID1,
+        RegisterEventHotKey(captureKey, captureMods, hotKeyID1,
                             GetApplicationEventTarget(), 0, &hotKeyRef)
 
         var hotKeyID2 = EventHotKeyID()
         hotKeyID2.signature = OSType(0x54435F48)
         hotKeyID2.id = 2
-        RegisterEventHotKey(screenshotKey, HOTKEY_MODIFIERS, hotKeyID2,
+        RegisterEventHotKey(screenshotKey, screenshotMods, hotKeyID2,
                             GetApplicationEventTarget(), 0, &hotKeyScreenshotRef)
     }
 
