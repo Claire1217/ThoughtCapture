@@ -56,6 +56,16 @@ your-folder/
     Thoughts.md
 ```
 
+## Obsidian Styling (optional)
+
+For styled thought cards, copy `thought-cards.css` to your vault:
+
+```bash
+cp thought-cards.css /path/to/vault/.obsidian/snippets/
+```
+
+Then in Obsidian: **Settings → Appearance → CSS snippets** → enable **thought-cards**.
+
 ## Configuration
 
 All settings are in the menu bar → **Settings**, or via CLI:
