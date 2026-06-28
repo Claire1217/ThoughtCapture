@@ -30,6 +30,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
     private var screenshotView: NSImageView?
     private var anchorY: CGFloat = 0
     private var isAIMode = false
+    private let aiColor = NSColor(red: 0.55, green: 0.36, blue: 0.85, alpha: 1)
     private var topRegionH: CGFloat = 10
 
     func show(selectedText: String, anchorPoint: NSPoint,
@@ -217,18 +218,41 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
         let text = tv.string
         let isCmd = text.hasPrefix("/") || text.hasPrefix("／")
         if isCmd {
-            hintLabel?.stringValue = "↵ 发送给 AI"
-            hintLabel?.textColor = NSColor.systemBlue
+            hintLabel?.stringValue = "↵ ask AI · esc"
+            hintLabel?.textColor = aiColor
             if !isAIMode {
                 isAIMode = true
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = 0.2
+                    c.layer?.borderWidth = 1.5
+                    c.layer?.borderColor = aiColor.withAlphaComponent(0.35).cgColor
+                    c.layer?.shadowColor = aiColor.cgColor
+                    c.layer?.shadowOpacity = 0.15
+                    c.layer?.shadowRadius = 12
+                }
                 updatingStyle = true
-                tv.textColor = NSColor.systemBlue
+                let full = NSMutableAttributedString(attributedString: tv.attributedString())
+                let range = NSRange(location: 0, length: full.length)
+                full.addAttribute(.foregroundColor, value: aiColor, range: range)
+                if full.length >= 1 {
+                    let slashRange = NSRange(location: 0, length: 1)
+                    full.addAttribute(.font, value: NSFont.systemFont(ofSize: 13, weight: .bold), range: slashRange)
+                    full.addAttribute(.kern, value: 3, range: slashRange)
+                }
+                tv.textStorage?.setAttributedString(full)
                 updatingStyle = false
             }
         } else if isAIMode {
             isAIMode = false
             hintLabel?.stringValue = "\u{21B5} save · esc"
             hintLabel?.textColor = TC.faint
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.2
+                c.layer?.borderWidth = 0
+                c.layer?.shadowColor = NSColor.black.cgColor
+                c.layer?.shadowOpacity = 0.10
+                c.layer?.shadowRadius = 16
+            }
             updatingStyle = true
             tv.textColor = TC.sub
             updatingStyle = false
