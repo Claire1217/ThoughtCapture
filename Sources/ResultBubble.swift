@@ -558,6 +558,7 @@ class ResultBubble {
                     ResultBubble.vaultName = foundVault
                     UserDefaults.standard.set(foundVault, forKey: "vaultName")
                 }
+                if isObsidian { LocalStorage.shared.installObsidianSnippet() }
 
                 // Save hotkeys from dropdowns
                 let modVals: [UInt32] = [UInt32(optionKey), UInt32(cmdKey), UInt32(controlKey), UInt32(shiftKey)]
