@@ -32,14 +32,21 @@ basicConstraints = critical, CA:false
 EOF
 
 # Generate key + cert
+echo "Generating certificate..."
 openssl req -x509 -newkey rsa:2048 \
     -keyout "$TMPDIR/key.pem" -out "$TMPDIR/cert.pem" \
-    -days 3650 -nodes -config "$TMPDIR/cert.conf" 2>/dev/null
+    -days 3650 -nodes -config "$TMPDIR/cert.conf"
 
-# Create p12 (use -legacy for macOS compatibility)
-openssl pkcs12 -export -out "$TMPDIR/tc.p12" \
+# Create p12 (-legacy only needed on OpenSSL 3.x; skip on older versions)
+if openssl pkcs12 -export -out "$TMPDIR/tc.p12" \
     -inkey "$TMPDIR/key.pem" -in "$TMPDIR/cert.pem" \
-    -passout pass:tc123 -legacy 2>/dev/null
+    -passout pass:tc123 -legacy 2>/dev/null; then
+    true
+else
+    openssl pkcs12 -export -out "$TMPDIR/tc.p12" \
+        -inkey "$TMPDIR/key.pem" -in "$TMPDIR/cert.pem" \
+        -passout pass:tc123 2>/dev/null
+fi
 
 # Import to login keychain
 echo "Importing to login keychain..."
