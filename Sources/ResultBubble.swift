@@ -321,61 +321,18 @@ class ResultBubble {
         root.addSubview(apiLabel)
         y -= 22
 
-        // Key field (secure by default) + eye toggle + test button
-        let apiKeyField = NSSecureTextField(frame: NSMakeRect(px, y - 22, fw - 102, 22))
+        let apiKeyField = NSTextField(frame: NSMakeRect(px, y - 22, fw - 72, 22))
         apiKeyField.placeholderString = "sk-..."
         apiKeyField.font = .systemFont(ofSize: 12)
         apiKeyField.identifier = NSUserInterfaceItemIdentifier("llmApiKey")
         apiKeyField.bezelStyle = .roundedBezel
         root.addSubview(apiKeyField)
 
-        // Plain text twin (hidden by default)
-        let apiKeyPlain = NSTextField(frame: apiKeyField.frame)
-        apiKeyPlain.placeholderString = "sk-..."
-        apiKeyPlain.font = .systemFont(ofSize: 12)
-        apiKeyPlain.identifier = NSUserInterfaceItemIdentifier("llmApiKeyPlain")
-        apiKeyPlain.bezelStyle = .roundedBezel
-        apiKeyPlain.isHidden = true
-        root.addSubview(apiKeyPlain)
-
-        // Eye button
-        let eyeBtn = NSButton(frame: NSMakeRect(W - px - 96, y - 22, 28, 22))
-        eyeBtn.bezelStyle = .rounded
-        eyeBtn.title = "👁"
-        eyeBtn.font = .systemFont(ofSize: 12)
-        eyeBtn.identifier = NSUserInterfaceItemIdentifier("eyeBtn")
-        root.addSubview(eyeBtn)
-
-        class EyeToggle: NSObject {
-            weak var secureField: NSSecureTextField?
-            weak var plainField: NSTextField?
-            var showing = false
-            @objc func toggle(_ sender: Any) {
-                showing = !showing
-                if showing {
-                    plainField?.stringValue = secureField?.stringValue ?? ""
-                    secureField?.isHidden = true
-                    plainField?.isHidden = false
-                } else {
-                    secureField?.stringValue = plainField?.stringValue ?? ""
-                    plainField?.isHidden = true
-                    secureField?.isHidden = false
-                }
-            }
-        }
-        let eyeToggle = EyeToggle()
-        eyeToggle.secureField = apiKeyField
-        eyeToggle.plainField = apiKeyPlain
-        eyeBtn.target = eyeToggle
-        eyeBtn.action = #selector(EyeToggle.toggle(_:))
-        settingsTargets.append(eyeToggle)
-
-        // Test button
         let testBtn = NSButton(title: "Test", target: nil, action: nil)
         testBtn.bezelStyle = .rounded
         testBtn.controlSize = .small
         testBtn.font = .systemFont(ofSize: 11)
-        testBtn.frame = NSMakeRect(W - px - 62, y - 22, 62, 22)
+        testBtn.frame = NSMakeRect(W - px - 62, y - 23, 62, 24)
         root.addSubview(testBtn)
 
         let testStatus = NSTextField(labelWithString: "")
@@ -385,13 +342,10 @@ class ResultBubble {
         root.addSubview(testStatus)
 
         class TestHandler: NSObject {
-            weak var secureField: NSSecureTextField?
-            weak var plainField: NSTextField?
+            weak var keyField: NSTextField?
             weak var statusLabel: NSTextField?
             @objc func test(_ sender: Any) {
-                let key = (secureField?.isHidden == true)
-                    ? (plainField?.stringValue ?? "")
-                    : (secureField?.stringValue ?? "")
+                let key = keyField?.stringValue ?? ""
                 guard !key.isEmpty else {
                     statusLabel?.textColor = .systemOrange
                     statusLabel?.stringValue = "Please enter an API key first"
@@ -427,8 +381,7 @@ class ResultBubble {
             }
         }
         let testHandler = TestHandler()
-        testHandler.secureField = apiKeyField
-        testHandler.plainField = apiKeyPlain
+        testHandler.keyField = apiKeyField
         testHandler.statusLabel = testStatus
         testBtn.target = testHandler
         testBtn.action = #selector(TestHandler.test(_:))
@@ -564,12 +517,7 @@ class ResultBubble {
                 let vaultPath = textField(in: root, id: "vaultPath")?.stringValue ?? ""
                 let vaultName = URL(fileURLWithPath: vaultPath).lastPathComponent
                 let backend = isObsidian ? "obsidian" : "notes"
-                // Read from whichever key field is visible
-                let secureKey = textField(in: root, id: "llmApiKey")
-                let plainKey = textField(in: root, id: "llmApiKeyPlain")
-                let apiKey = (secureKey?.isHidden == true)
-                    ? (plainKey?.stringValue ?? "")
-                    : (secureKey?.stringValue ?? "")
+                let apiKey = textField(in: root, id: "llmApiKey")?.stringValue ?? ""
 
                 LocalStorage.shared.vaultPath = vaultPath
                 LocalStorage.shared.backend = backend
