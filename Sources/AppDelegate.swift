@@ -327,24 +327,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func sendToServer(thought: String, selectedText: String,
                       appName: String, windowTitle: String, browserURL: String,
                       editable: Bool = false, screenshotPath: String? = nil) {
-        var cleanThought = thought
+        let cleanThought = thought
 
-        // /问 → DeepSeek quick Q&A
-        let askPrefixes = ["/问", "／问", "/ask", "／ask"]
-        let isAsk = askPrefixes.contains(where: { cleanThought.hasPrefix($0) })
-        if isAsk {
-            let prefix = askPrefixes.first(where: { cleanThought.hasPrefix($0) })!
-            let question = String(cleanThought.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
-            if question.isEmpty { return }
-            capturePanel?.close()
-            resultBubble?.addItem(text: "🔍 \(question)", savedTo: "asking…", ok: true)
-            askDeepSeek(question: question, context: selectedText)
-            return
-        }
-
-        // Strip other "/" prefixes
+        // Any "/" prefix → DeepSeek quick Q&A (streaming in panel)
         if cleanThought.hasPrefix("/") || cleanThought.hasPrefix("／") {
-            cleanThought = String(cleanThought.dropFirst()).trimmingCharacters(in: .whitespaces)
+            let stripped = String(cleanThought.drop(while: { $0 == "/" || $0 == "／" }))
+            // Also strip known prefixes like 问/ask
+            var question = stripped
+            for p in ["问", "ask"] {
+                if question.hasPrefix(p) {
+                    question = String(question.dropFirst(p.count))
+                    break
+                }
+            }
+            question = question.trimmingCharacters(in: .whitespaces)
+            if question.isEmpty { return }
+            capturePanel?.showStreamingAnswer()
+            askDeepSeekStreaming(question: question, context: selectedText)
+            return
         }
         if cleanThought.isEmpty && selectedText.isEmpty { return }
 
@@ -360,7 +360,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         resultBubble?.addItem(text: cleanThought, savedTo: result.savedTo, ok: result.ok)
     }
 
-    func askDeepSeek(question: String, context: String) {
+    private var streamSession: URLSession?
+    private var streamDelegate: StreamingDelegate?
+
+    func askDeepSeekStreaming(question: String, context: String) {
         let storage = LocalStorage.shared
         let apiKey = storage.llmApiKey
         let apiBase = storage.llmApiBase
@@ -368,7 +371,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         guard !apiKey.isEmpty else {
             fputs("[TC] DeepSeek API key not set\n", stderr)
-            resultBubble?.addItem(text: "⚠️ DeepSeek API key 未设置", savedTo: "error", ok: false)
+            capturePanel?.appendStreamChunk("⚠️ API key 未设置 — 在 Settings 里配置 DeepSeek API key")
+            capturePanel?.finishStream()
             return
         }
 
@@ -381,7 +385,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             messages.append(["role": "user", "content": question])
         }
 
-        let body: [String: Any] = ["model": model, "messages": messages, "max_tokens": 512, "temperature": 0.7]
+        let body: [String: Any] = ["model": model, "messages": messages,
+                                    "max_tokens": 512, "temperature": 0.7, "stream": true]
 
         guard let url = URL(string: apiBase),
               let jsonData = try? JSONSerialization.data(withJSONObject: body) else { return }
@@ -391,29 +396,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         req.httpBody = jsonData
-        req.timeoutInterval = 30
+        req.timeoutInterval = 60
 
-        URLSession.shared.dataTask(with: req) { [weak self] data, resp, err in
-            DispatchQueue.main.async {
-                if let err = err {
-                    fputs("[TC] DeepSeek error: \(err.localizedDescription)\n", stderr)
-                    self?.resultBubble?.addItem(text: "⚠️ \(err.localizedDescription)", savedTo: "error", ok: false)
-                    return
-                }
-                guard let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let choices = json["choices"] as? [[String: Any]],
-                      let msg = choices.first?["message"] as? [String: Any],
-                      let content = msg["content"] as? String else {
-                    fputs("[TC] DeepSeek: bad response\n", stderr)
-                    self?.resultBubble?.addItem(text: "⚠️ 无法解析回复", savedTo: "error", ok: false)
-                    return
-                }
-                let answer = content.trimmingCharacters(in: .whitespacesAndNewlines)
-                fputs("[TC] DeepSeek answer: \(answer.prefix(80))...\n", stderr)
-                self?.resultBubble?.addItem(text: "💬 \(answer)", savedTo: "deepseek", ok: true)
-            }
-        }.resume()
+        let del = StreamingDelegate(panel: capturePanel, bubble: resultBubble, question: question)
+        streamDelegate = del
+        let session = URLSession(configuration: .default, delegate: del, delegateQueue: nil)
+        streamSession = session
+        session.dataTask(with: req).resume()
     }
 }
 
@@ -431,4 +420,64 @@ func hotKeyHandler(nextHandler: EventHandlerCallRef?, event: EventRef?,
         : #selector(AppDelegate.triggerCapture)
     delegate.performSelector(onMainThread: sel, with: nil, waitUntilDone: false)
     return noErr
+}
+
+// MARK: - SSE Streaming Delegate
+
+class StreamingDelegate: NSObject, URLSessionDataDelegate {
+    weak var panel: CapturePanel?
+    weak var bubble: ResultBubble?
+    let question: String
+    private var buffer = ""
+    private var fullAnswer = ""
+
+    init(panel: CapturePanel?, bubble: ResultBubble?, question: String) {
+        self.panel = panel
+        self.bubble = bubble
+        self.question = question
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask,
+                    didReceive data: Data) {
+        guard let chunk = String(data: data, encoding: .utf8) else { return }
+        buffer += chunk
+
+        while let lineEnd = buffer.firstIndex(of: "\n") {
+            let line = String(buffer[buffer.startIndex..<lineEnd])
+            buffer = String(buffer[buffer.index(after: lineEnd)...])
+
+            guard line.hasPrefix("data: ") else { continue }
+            let payload = String(line.dropFirst(6))
+            if payload == "[DONE]" {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    self.panel?.finishStream()
+                    fputs("[TC] DeepSeek stream done: \(self.fullAnswer.prefix(80))...\n", stderr)
+                }
+                return
+            }
+
+            guard let jsonData = payload.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                  let choices = json["choices"] as? [[String: Any]],
+                  let delta = choices.first?["delta"] as? [String: Any],
+                  let content = delta["content"] as? String else { continue }
+
+            fullAnswer += content
+            DispatchQueue.main.async { [weak self] in
+                self?.panel?.appendStreamChunk(content)
+            }
+        }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    didCompleteWithError error: Error?) {
+        if let err = error {
+            DispatchQueue.main.async { [weak self] in
+                fputs("[TC] DeepSeek stream error: \(err.localizedDescription)\n", stderr)
+                self?.panel?.appendStreamChunk("\n⚠️ \(err.localizedDescription)")
+                self?.panel?.finishStream()
+            }
+        }
+    }
 }

@@ -294,15 +294,98 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
         let text = typed.isEmpty ? quotedText : typed
         guard !text.isEmpty else { close(); return }
         fputs("[TC] submit: \(text)\n", stderr)
-        close()
+        let isAI = text.hasPrefix("/") || text.hasPrefix("／")
+        if !isAI {
+            close()
+        }
         if let m = clickMonitor { NSEvent.removeMonitor(m); clickMonitor = nil }
         onSubmit?(text)
+    }
+
+    // MARK: Streaming answer display
+
+    private var answerView: NSTextView?
+    private var answerScroll: NSScrollView?
+    private var answerPhase = false
+
+    func showStreamingAnswer() {
+        guard let p = panel, let c = card else { return }
+        answerPhase = true
+
+        // Disable input
+        textView?.isEditable = false
+        textView?.textColor = TC.muted
+        hintLabel?.stringValue = "esc 关闭"
+        hintLabel?.textColor = TC.faint
+
+        // Prepare answer views (initially hidden, zero height)
+        let sep = NSView(frame: NSMakeRect(16, 0, pw - 32, 1))
+        sep.wantsLayer = true
+        sep.layer?.backgroundColor = NSColor.separatorColor.cgColor
+        sep.identifier = NSUserInterfaceItemIdentifier("answerSep")
+        c.addSubview(sep)
+
+        let asv = NSScrollView(frame: NSMakeRect(10, 8, pw - 20, 0))
+        asv.hasVerticalScroller = true
+        asv.hasHorizontalScroller = false
+        asv.borderType = .noBorder
+        asv.drawsBackground = false
+        asv.autohidesScrollers = true
+
+        let atv = NSTextView(frame: NSMakeRect(0, 0, pw - 28, 0))
+        atv.font = NSFont.systemFont(ofSize: 12)
+        atv.textColor = TC.faint
+        atv.drawsBackground = false
+        atv.isEditable = false
+        atv.isSelectable = true
+        atv.textContainerInset = NSSize(width: 4, height: 4)
+        atv.textContainer?.widthTracksTextView = true
+        atv.textContainer?.containerSize = NSSize(width: pw - 36, height: CGFloat.greatestFiniteMagnitude)
+        atv.isVerticallyResizable = true
+        atv.string = "thinking..."
+        asv.documentView = atv
+        c.addSubview(asv)
+        answerView = atv
+        answerScroll = asv
+
+        // Animate expansion
+        let ansH: CGFloat = 140
+        let frame = p.frame
+        let newFrame = NSMakeRect(frame.origin.x, frame.origin.y - ansH,
+                                  frame.width, frame.height + ansH)
+
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.2
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            p.animator().setFrame(newFrame, display: true)
+        } completionHandler: {
+            c.frame = NSMakeRect(0, 0, newFrame.width, newFrame.height)
+            sep.frame = NSMakeRect(16, ansH + 2, self.pw - 32, 1)
+            asv.frame = NSMakeRect(10, 8, self.pw - 20, ansH - 12)
+            atv.frame = NSMakeRect(0, 0, self.pw - 28, ansH - 12)
+        }
+    }
+
+    func appendStreamChunk(_ chunk: String) {
+        guard let atv = answerView else { return }
+        if atv.string == "thinking..." {
+            atv.string = ""
+            atv.textColor = TC.sub
+        }
+        atv.string += chunk
+        atv.scrollToEndOfDocument(nil)
+    }
+
+    func finishStream() {
+        hintLabel?.stringValue = "esc 关闭 · 已完成"
+        hintLabel?.textColor = TC.faint
     }
 
     var isOpen: Bool { panel != nil }
 
     func close() {
         fputs("[TC] CapturePanel.close()\n", stderr)
+        answerView = nil; answerScroll = nil; answerPhase = false
         panel?.close(); panel = nil
         screenshotView = nil
         ctxBoxView = nil
