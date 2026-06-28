@@ -12,6 +12,12 @@ A lightweight macOS menu bar app for capturing fleeting thoughts. Press a hotkey
 
 ## Install
 
+### Download (recommended)
+1. Download the latest `.zip` from [Releases](https://github.com/Claire1217/ThoughtCapture/releases)
+2. Unzip and drag `ThoughtCapture.app` to `/Applications`
+3. Right-click the app → **Open** (first time only, to bypass unsigned app warning)
+
+### Build from source
 Requires macOS 12+ and Xcode Command Line Tools (`xcode-select --install`).
 
 ```bash
