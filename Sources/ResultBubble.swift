@@ -677,7 +677,7 @@ class ResultBubble {
         if thoughtCount == 0 {
             let emptyH: CGFloat = 64
             container.frame = NSMakeRect(0, 0, popWidth, emptyH)
-            let hint = NSTextField(labelWithString: "Press ⌥T to capture a thought")
+            let hint = NSTextField(labelWithString: "Press \(captureHotkeyLabel) to capture a thought")
             hint.font = rounded(size: 12)
             hint.textColor = TC.muted
             hint.alignment = .center

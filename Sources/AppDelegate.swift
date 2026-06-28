@@ -28,7 +28,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func showFirstLaunchSetup() {
         let alert = NSAlert()
         alert.messageText = "Welcome to ThoughtCapture"
-        alert.informativeText = "Press ⌥T anywhere to capture a thought.\n\nFirst, choose where to save your thoughts:"
+        alert.informativeText = "Press \(captureHotkeyLabel) anywhere to capture a thought.\n\nFirst, choose where to save your thoughts:"
         alert.addButton(withTitle: "Choose Obsidian Vault…")
         alert.addButton(withTitle: "Use Apple Notes")
         alert.alertStyle = .informational
@@ -90,7 +90,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.title = "TC"
 
         let menu = NSMenu()
-        let captureItem = NSMenuItem(title: "Capture Thought (⌥T)",
+        let captureItem = NSMenuItem(title: "Capture Thought (\(captureHotkeyLabel))",
                                      action: #selector(triggerCapture), keyEquivalent: "")
         captureItem.target = self
         menu.addItem(captureItem)
