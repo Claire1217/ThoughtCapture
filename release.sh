@@ -39,10 +39,13 @@ EOF
 cp -f bubbleicon.png "$APP/Contents/Resources/" 2>/dev/null || true
 
 echo "Compiling..."
-swiftc ThoughtCaptureHotkey.swift \
+swiftc Sources/*.swift \
     -o "$BINARY" \
     -framework Cocoa \
     -framework Carbon \
+    -framework ApplicationServices \
+    -framework CoreGraphics \
+    -framework WebKit \
     -O
 
 echo "Signing..."

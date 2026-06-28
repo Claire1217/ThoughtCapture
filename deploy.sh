@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 SIGNING_ID="ThoughtCapture Dev"
 
 echo "=== Building ==="
-swiftc ThoughtCaptureHotkey.swift -o ThoughtCaptureHotkey -framework Cocoa -framework Carbon
+swiftc Sources/*.swift -o ThoughtCapture -framework Cocoa -framework Carbon -framework ApplicationServices -framework CoreGraphics -framework WebKit
 
 echo "=== Stopping old instances ==="
 killall ThoughtCapture 2>/dev/null || true
@@ -14,7 +14,7 @@ sleep 0.5
 echo "=== Deploying ==="
 mkdir -p /Applications/ThoughtCapture.app/Contents/MacOS
 mkdir -p /Applications/ThoughtCapture.app/Contents/Resources
-cp ThoughtCaptureHotkey /Applications/ThoughtCapture.app/Contents/MacOS/ThoughtCapture
+cp ThoughtCapture /Applications/ThoughtCapture.app/Contents/MacOS/ThoughtCapture
 cp bubbleicon.png /Applications/ThoughtCapture.app/Contents/Resources/ 2>/dev/null || true
 
 # Write Info.plist

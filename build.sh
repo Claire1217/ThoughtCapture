@@ -45,10 +45,13 @@ cp -f bubbleicon.png "$APP/Contents/Resources/" 2>/dev/null || true
 
 # Compile
 echo "Compiling..."
-swiftc ThoughtCaptureHotkey.swift \
+swiftc Sources/*.swift \
     -o "$BINARY" \
     -framework Cocoa \
-    -framework Carbon
+    -framework Carbon \
+    -framework ApplicationServices \
+    -framework CoreGraphics \
+    -framework WebKit
 
 # Sign with persistent certificate (NOT adhoc)
 echo "Signing with '$SIGNING_ID'..."

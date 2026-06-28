@@ -1,17 +1,23 @@
 .env
+.env.example
 .DS_Store
 __pycache__/
+
+# Build artifacts
+ThoughtCapture
 ThoughtCapture.app/
 ThoughtCaptureHotkey
+ThoughtCaptureHotkey.swift
 tc_bin
 *.o
 *.dSYM/
+*.zip
+
+# Legacy
+archive/
 server.py
 global_capture.py
 test_server.py
-.env.example
-archive/
-*.zip
+capture.sh
 bubbleicon2.png
 bubbleicon3.png
-capture.sh
