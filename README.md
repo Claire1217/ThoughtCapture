@@ -4,6 +4,8 @@ A lightweight macOS menu bar app for capturing fleeting thoughts. Press a hotkey
 
 轻量 macOS 菜单栏应用，随时随地按快捷键记录灵感，自动保存到 Obsidian 或 Apple Notes。
 
+![Obsidian demo](assets/obsidian-demo.png)
+
 ## Features / 功能
 
 - **Global hotkey** — capture thoughts from any app without switching windows
