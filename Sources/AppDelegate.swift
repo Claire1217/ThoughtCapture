@@ -364,8 +364,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             appName: appName, browserURL: browserURL,
             screenshotPath: screenshotPath)
 
-        // Agent disabled in v1 — needs better Obsidian formatting before re-enabling
-        // LocalStorage.shared.triggerThoughtAgent(thought: cleanThought)
 
         capturePanel?.close()
         resultBubble?.addItem(text: cleanThought, savedTo: result.savedTo, ok: result.ok)

@@ -4,18 +4,6 @@ class LocalStorage {
     static let shared = LocalStorage()
     private var colorIndex = 0
 
-    var claudeBin: String {
-        if let custom = UserDefaults.standard.string(forKey: "claudeBin"), !custom.isEmpty {
-            return custom
-        }
-        let candidates = [
-            NSString(string: "~/.local/bin/claude").expandingTildeInPath,
-            "/usr/local/bin/claude",
-            "/opt/homebrew/bin/claude"
-        ]
-        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) } ?? ""
-    }
-
     var vaultPath: String {
         get { UserDefaults.standard.string(forKey: "vaultPath") ?? "" }
         set { UserDefaults.standard.set(newValue, forKey: "vaultPath") }
@@ -27,11 +15,6 @@ class LocalStorage {
             UserDefaults.standard.set(newValue, forKey: "storageBackend")
             ResultBubble.storageBackend = newValue
         }
-    }
-
-    var thoughtAgentMode: String {
-        get { UserDefaults.standard.string(forKey: "thoughtAgentMode") ?? "auto" }
-        set { UserDefaults.standard.set(newValue, forKey: "thoughtAgentMode") }
     }
 
     var llmApiKey: String {
