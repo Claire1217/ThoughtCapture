@@ -96,6 +96,36 @@ defaults write com.thoughtcapture.app llmApiKey "sk-your-key"
 killall ThoughtCapture; open /Applications/ThoughtCapture.app
 ```
 
+## Agent Installation
+
+If you are an AI coding agent (Claude Code, Cursor, etc.) helping a user install ThoughtCapture, run the following commands in order:
+
+```bash
+# 1. Install
+curl -fsSL https://raw.githubusercontent.com/Claire1217/ThoughtCapture/main/install.sh | bash
+
+# 2. Configure (substitute real values)
+defaults write com.thoughtcapture.app vaultPath "/absolute/path/to/obsidian-folder"
+defaults write com.thoughtcapture.app storageBackend "obsidian"   # or "notes"
+defaults write com.thoughtcapture.app llmApiKey "sk-xxx"          # optional, for /AI
+
+# 3. Restart to apply config
+killall ThoughtCapture 2>/dev/null; open /Applications/ThoughtCapture.app
+```
+
+**You cannot automate this step** — the user must do it manually:
+> System Settings → Privacy & Security → Accessibility → enable ThoughtCapture
+
+To verify installation worked:
+```bash
+# Check app is running
+pgrep -x ThoughtCapture && echo "running" || echo "not running"
+
+# Check config
+defaults read com.thoughtcapture.app vaultPath 2>/dev/null
+defaults read com.thoughtcapture.app storageBackend 2>/dev/null
+```
+
 ## License
 
 MIT
