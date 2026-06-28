@@ -184,7 +184,7 @@ class ResultBubble {
         }
         settingsTargets.removeAll()
 
-        let W: CGFloat = 400, H: CGFloat = 510
+        let W: CGFloat = 400, H: CGFloat = 560
         let win = NSWindow(contentRect: NSMakeRect(0, 0, W, H),
                            styleMask: [.titled, .closable], backing: .buffered, defer: false)
         win.title = "ThoughtCapture Settings"
@@ -336,34 +336,128 @@ class ResultBubble {
 
         // ━━━━━  QUICK Q&A  ━━━━━
         sep(at: &y)
-        sectionTitle("QUICK Q&A", at: &y)
+        sectionTitle("QUICK Q&A  (DeepSeek)", at: &y)
 
-        // Status indicator
-        let hasKey = !LocalStorage.shared.llmApiKey.isEmpty
-        let statusDot = NSTextField(labelWithString: hasKey ? "✓ Connected" : "✗ Not configured")
-        statusDot.font = .systemFont(ofSize: 12)
-        statusDot.textColor = hasKey ? .systemGreen : .systemOrange
-        statusDot.frame = NSMakeRect(px, y - 16, fw - 80, 16)
-        statusDot.identifier = NSUserInterfaceItemIdentifier("apiStatus")
-        root.addSubview(statusDot)
+        let apiLabel = NSTextField(labelWithString: "API Key")
+        apiLabel.font = .systemFont(ofSize: 12)
+        apiLabel.textColor = .secondaryLabelColor
+        apiLabel.frame = NSMakeRect(px, y - 16, fw, 16)
+        root.addSubview(apiLabel)
+        y -= 22
 
-        let modelLabel = NSTextField(labelWithString: LocalStorage.shared.llmModel)
-        modelLabel.font = .systemFont(ofSize: 11)
-        modelLabel.textColor = .tertiaryLabelColor
-        modelLabel.alignment = .right
-        modelLabel.frame = NSMakeRect(W - px - 80, y - 16, 80, 16)
-        root.addSubview(modelLabel)
-        y -= 26
-
-        let apiKeyField = NSSecureTextField(frame: NSMakeRect(px, y - 22, fw, 22))
+        // Key field (secure by default) + eye toggle + test button
+        let apiKeyField = NSSecureTextField(frame: NSMakeRect(px, y - 22, fw - 102, 22))
         apiKeyField.placeholderString = "sk-..."
         apiKeyField.font = .systemFont(ofSize: 12)
         apiKeyField.identifier = NSUserInterfaceItemIdentifier("llmApiKey")
         apiKeyField.bezelStyle = .roundedBezel
         root.addSubview(apiKeyField)
-        y -= 28
 
-        hint("Type / to ask AI · Get key: platform.deepseek.com", at: &y)
+        // Plain text twin (hidden by default)
+        let apiKeyPlain = NSTextField(frame: apiKeyField.frame)
+        apiKeyPlain.placeholderString = "sk-..."
+        apiKeyPlain.font = .systemFont(ofSize: 12)
+        apiKeyPlain.identifier = NSUserInterfaceItemIdentifier("llmApiKeyPlain")
+        apiKeyPlain.bezelStyle = .roundedBezel
+        apiKeyPlain.isHidden = true
+        root.addSubview(apiKeyPlain)
+
+        // Eye button
+        let eyeBtn = NSButton(frame: NSMakeRect(W - px - 96, y - 22, 28, 22))
+        eyeBtn.bezelStyle = .rounded
+        eyeBtn.title = "👁"
+        eyeBtn.font = .systemFont(ofSize: 12)
+        eyeBtn.identifier = NSUserInterfaceItemIdentifier("eyeBtn")
+        root.addSubview(eyeBtn)
+
+        class EyeToggle: NSObject {
+            weak var secureField: NSSecureTextField?
+            weak var plainField: NSTextField?
+            var showing = false
+            @objc func toggle(_ sender: Any) {
+                showing = !showing
+                if showing {
+                    plainField?.stringValue = secureField?.stringValue ?? ""
+                    secureField?.isHidden = true
+                    plainField?.isHidden = false
+                } else {
+                    secureField?.stringValue = plainField?.stringValue ?? ""
+                    plainField?.isHidden = true
+                    secureField?.isHidden = false
+                }
+            }
+        }
+        let eyeToggle = EyeToggle()
+        eyeToggle.secureField = apiKeyField
+        eyeToggle.plainField = apiKeyPlain
+        eyeBtn.target = eyeToggle
+        eyeBtn.action = #selector(EyeToggle.toggle(_:))
+        settingsTargets.append(eyeToggle)
+
+        // Test button
+        let testBtn = NSButton(title: "Test", target: nil, action: nil)
+        testBtn.bezelStyle = .rounded
+        testBtn.controlSize = .small
+        testBtn.font = .systemFont(ofSize: 11)
+        testBtn.frame = NSMakeRect(W - px - 62, y - 22, 62, 22)
+        root.addSubview(testBtn)
+
+        let testStatus = NSTextField(labelWithString: "")
+        testStatus.font = .systemFont(ofSize: 11)
+        testStatus.frame = NSMakeRect(px, y - 38, fw, 14)
+        testStatus.identifier = NSUserInterfaceItemIdentifier("testStatus")
+        root.addSubview(testStatus)
+
+        class TestHandler: NSObject {
+            weak var secureField: NSSecureTextField?
+            weak var plainField: NSTextField?
+            weak var statusLabel: NSTextField?
+            @objc func test(_ sender: Any) {
+                let key = (secureField?.isHidden == true)
+                    ? (plainField?.stringValue ?? "")
+                    : (secureField?.stringValue ?? "")
+                guard !key.isEmpty else {
+                    statusLabel?.textColor = .systemOrange
+                    statusLabel?.stringValue = "Please enter an API key first"
+                    return
+                }
+                statusLabel?.textColor = .secondaryLabelColor
+                statusLabel?.stringValue = "Testing…"
+
+                let base = LocalStorage.shared.llmApiBase
+                let url = URL(string: "\(base)/chat/completions")!
+                var req = URLRequest(url: url)
+                req.httpMethod = "POST"
+                req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+                req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                let body: [String: Any] = [
+                    "model": LocalStorage.shared.llmModel,
+                    "messages": [["role": "user", "content": "hi"]],
+                    "max_tokens": 1
+                ]
+                req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+                let label = self.statusLabel
+                URLSession.shared.dataTask(with: req) { _, resp, err in
+                    DispatchQueue.main.async {
+                        if let http = resp as? HTTPURLResponse, http.statusCode == 200 {
+                            label?.textColor = .systemGreen
+                            label?.stringValue = "✓ Connected"
+                        } else {
+                            label?.textColor = .systemRed
+                            label?.stringValue = "✗ Failed — check your key"
+                        }
+                    }
+                }.resume()
+            }
+        }
+        let testHandler = TestHandler()
+        testHandler.secureField = apiKeyField
+        testHandler.plainField = apiKeyPlain
+        testHandler.statusLabel = testStatus
+        testBtn.target = testHandler
+        testBtn.action = #selector(TestHandler.test(_:))
+        settingsTargets.append(testHandler)
+        y -= 42
 
         // ━━━━━  HOTKEYS  ━━━━━
         sep(at: &y)
@@ -494,7 +588,12 @@ class ResultBubble {
                 let vaultPath = textField(in: root, id: "vaultPath")?.stringValue ?? ""
                 let vaultName = URL(fileURLWithPath: vaultPath).lastPathComponent
                 let backend = isObsidian ? "obsidian" : "notes"
-                let apiKey = textField(in: root, id: "llmApiKey")?.stringValue ?? ""
+                // Read from whichever key field is visible
+                let secureKey = textField(in: root, id: "llmApiKey")
+                let plainKey = textField(in: root, id: "llmApiKeyPlain")
+                let apiKey = (secureKey?.isHidden == true)
+                    ? (plainKey?.stringValue ?? "")
+                    : (secureKey?.stringValue ?? "")
                 let notePath = textField(in: root, id: "notePath")?.stringValue ?? ""
 
                 LocalStorage.shared.vaultPath = vaultPath
@@ -550,12 +649,6 @@ class ResultBubble {
                 if let delegate = NSApp.delegate as? AppDelegate {
                     delegate.registerHotkey()
                 }
-
-                // Update status indicator
-                let statusField = textField(in: root, id: "apiStatus")
-                let keySet = !LocalStorage.shared.llmApiKey.isEmpty
-                statusField?.stringValue = keySet ? "✓ Connected" : "✗ Not configured"
-                statusField?.textColor = keySet ? .systemGreen : .systemOrange
 
                 let status = textField(in: root, id: "status")
                 status?.textColor = .systemGreen
