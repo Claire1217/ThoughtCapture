@@ -184,7 +184,7 @@ class ResultBubble {
         }
         settingsTargets.removeAll()
 
-        let W: CGFloat = 400, H: CGFloat = 560
+        let W: CGFloat = 400, H: CGFloat = 490
         let win = NSWindow(contentRect: NSMakeRect(0, 0, W, H),
                            styleMask: [.titled, .closable], backing: .buffered, defer: false)
         win.title = "ThoughtCapture Settings"
@@ -267,28 +267,7 @@ class ResultBubble {
         browseBtn.font = .systemFont(ofSize: 11)
         browseBtn.frame = NSMakeRect(fw - 62, 1, 62, 22)
         vaultRow.addSubview(browseBtn)
-        y -= 34
-
-        // Note path template
-        let notePathRow = NSView(frame: NSMakeRect(px, y - 26, fw, 26))
-        notePathRow.identifier = NSUserInterfaceItemIdentifier("notePathRow")
-        root.addSubview(notePathRow)
-
-        let npLabel = NSTextField(labelWithString: "Save to:")
-        npLabel.font = .systemFont(ofSize: 12)
-        npLabel.textColor = .secondaryLabelColor
-        npLabel.frame = NSMakeRect(0, 4, 52, 16)
-        notePathRow.addSubview(npLabel)
-
-        let npField = NSTextField(frame: NSMakeRect(54, 2, fw - 54, 22))
-        npField.placeholderString = "01_daily/{date}/Daily random thoughts.md"
-        npField.font = .systemFont(ofSize: 11)
-        npField.identifier = NSUserInterfaceItemIdentifier("notePath")
-        npField.bezelStyle = .roundedBezel
-        notePathRow.addSubview(npField)
         y -= 30
-
-        hint("{date} = 2026-06-29", at: &y)
 
         class BrowseHandler: NSObject {
             weak var pathField: NSTextField?
@@ -311,11 +290,9 @@ class ResultBubble {
 
         class StorageToggle: NSObject {
             weak var vaultRow: NSView?
-            weak var notePathRow: NSView?
             @objc func changed(_ sender: NSSegmentedControl) {
                 let isNotes = sender.selectedSegment == 1
                 vaultRow?.isHidden = isNotes
-                notePathRow?.isHidden = isNotes
                 if isNotes {
                     DispatchQueue.global().async {
                         let proc = Process()
@@ -329,7 +306,6 @@ class ResultBubble {
         }
         let storageToggle = StorageToggle()
         storageToggle.vaultRow = vaultRow
-        storageToggle.notePathRow = notePathRow
         storageSeg.target = storageToggle
         storageSeg.action = #selector(StorageToggle.changed(_:))
         settingsTargets.append(storageToggle)
@@ -594,15 +570,11 @@ class ResultBubble {
                 let apiKey = (secureKey?.isHidden == true)
                     ? (plainKey?.stringValue ?? "")
                     : (secureKey?.stringValue ?? "")
-                let notePath = textField(in: root, id: "notePath")?.stringValue ?? ""
 
                 LocalStorage.shared.vaultPath = vaultPath
                 LocalStorage.shared.backend = backend
                 if !apiKey.isEmpty {
                     LocalStorage.shared.llmApiKey = apiKey
-                }
-                if !notePath.isEmpty {
-                    UserDefaults.standard.set(notePath, forKey: "notePath")
                 }
                 if !vaultName.isEmpty {
                     ResultBubble.vaultName = vaultName
@@ -665,15 +637,14 @@ class ResultBubble {
         settingsTargets.append(saveHandler)
 
         // ── Load current values ──
-        loadSettings(root: root, storageSeg: storageSeg, vaultRow: vaultRow, notePathRow: notePathRow)
+        loadSettings(root: root, storageSeg: storageSeg, vaultRow: vaultRow)
 
         settingsWin = win
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func loadSettings(root: NSView, storageSeg: NSSegmentedControl,
-                              vaultRow: NSView, notePathRow: NSView) {
+    private func loadSettings(root: NSView, storageSeg: NSSegmentedControl, vaultRow: NSView) {
         func textField(in view: NSView, id: String) -> NSTextField? {
             for sub in view.subviews {
                 if let tf = sub as? NSTextField, tf.identifier?.rawValue == id { return tf }
@@ -684,7 +655,6 @@ class ResultBubble {
         let storage = LocalStorage.shared.backend
         storageSeg.selectedSegment = storage == "notes" ? 1 : 0
         vaultRow.isHidden = storage == "notes"
-        notePathRow.isHidden = storage == "notes"
 
         let savedVaultPath = LocalStorage.shared.vaultPath
         if !savedVaultPath.isEmpty {
@@ -693,10 +663,6 @@ class ResultBubble {
         let savedKey = LocalStorage.shared.llmApiKey
         if !savedKey.isEmpty {
             textField(in: root, id: "llmApiKey")?.stringValue = savedKey
-        }
-        let savedNotePath = UserDefaults.standard.string(forKey: "notePath") ?? ""
-        if !savedNotePath.isEmpty {
-            textField(in: root, id: "notePath")?.stringValue = savedNotePath
         }
     }
 
