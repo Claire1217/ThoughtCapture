@@ -15,13 +15,8 @@ A lightweight macOS menu bar app for capturing fleeting thoughts. Press a hotkey
 Requires macOS 12+ and Xcode Command Line Tools (`xcode-select --install`).
 
 ```bash
-git clone https://github.com/clairezhangjw/ThoughtCapture.git
+git clone https://github.com/Claire1217/ThoughtCapture.git
 cd ThoughtCapture
-
-# Create a code signing certificate (one-time, needed for Accessibility permission)
-./setup_cert.sh
-
-# Build, sign, and install to /Applications
 ./deploy.sh
 ```
 

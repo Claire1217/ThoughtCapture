@@ -2,7 +2,7 @@
 set -e
 cd "$(dirname "$0")"
 
-SIGNING_ID="ThoughtCapture Dev"
+DEV_CERT="ThoughtCapture Dev"
 
 echo "=== Building ==="
 swiftc Sources/*.swift -o ThoughtCapture -framework Cocoa -framework Carbon -framework ApplicationServices -framework CoreGraphics -framework WebKit
@@ -17,7 +17,6 @@ mkdir -p /Applications/ThoughtCapture.app/Contents/Resources
 cp ThoughtCapture /Applications/ThoughtCapture.app/Contents/MacOS/ThoughtCapture
 cp bubbleicon.png /Applications/ThoughtCapture.app/Contents/Resources/ 2>/dev/null || true
 
-# Write Info.plist
 cat > /Applications/ThoughtCapture.app/Contents/Info.plist << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -38,22 +37,22 @@ cat > /Applications/ThoughtCapture.app/Contents/Info.plist << 'EOF'
 </plist>
 EOF
 
-# Sign with persistent certificate
 echo "=== Signing ==="
-codesign --force --sign "$SIGNING_ID" /Applications/ThoughtCapture.app
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "$DEV_CERT"; then
+    codesign --force --sign "$DEV_CERT" /Applications/ThoughtCapture.app
+    echo "Signed with '$DEV_CERT' (dev certificate)"
+else
+    codesign --force --sign - /Applications/ThoughtCapture.app
+    echo "Signed with ad-hoc signature"
+fi
 
 echo "=== Launching ==="
 open /Applications/ThoughtCapture.app
 sleep 1
 
-# Verify AX status
 echo ""
-echo "=== Status ==="
-pgrep -c ThoughtCapture | xargs -I{} echo "Running instances: {}"
+echo "✓ Installed to /Applications/ThoughtCapture.app"
 echo ""
-echo "✓ Deployed with '$SIGNING_ID' certificate."
-echo "  Accessibility permission persists across rebuilds."
-echo ""
-echo "If this is the FIRST deploy with this certificate:"
+echo "Next step: grant Accessibility permission"
 echo "  System Settings → Privacy & Security → Accessibility"
-echo "  → remove old ThoughtCapture entry → add /Applications/ThoughtCapture.app"
+echo "  → enable ThoughtCapture"
