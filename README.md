@@ -58,11 +58,19 @@ your-folder/
 
 ## Configuration
 
-All settings are in the menu bar → **Settings**:
+All settings are in the menu bar → **Settings**, or via CLI:
 
-- **Storage** — Obsidian Vault folder or Apple Notes
-- **AI Quick Answer** — DeepSeek API key
-- **Hotkeys** — modifier + key for each action
+```bash
+# Storage — path to the folder where thoughts are saved
+defaults write com.thoughtcapture.app vaultPath "/path/to/obsidian-vault/01_daily"
+defaults write com.thoughtcapture.app storageBackend "obsidian"  # or "notes"
+
+# AI Quick Answer — DeepSeek API key (enables / commands)
+defaults write com.thoughtcapture.app llmApiKey "sk-your-key"
+
+# Restart app to apply CLI changes
+killall ThoughtCapture; open /Applications/ThoughtCapture.app
+```
 
 ## License
 
