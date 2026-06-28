@@ -184,7 +184,7 @@ class ResultBubble {
         }
         settingsTargets.removeAll()
 
-        let W: CGFloat = 400, H: CGFloat = 490
+        let W: CGFloat = 400, H: CGFloat = 530
         let win = NSWindow(contentRect: NSMakeRect(0, 0, W, H),
                            styleMask: [.titled, .closable], backing: .buffered, defer: false)
         win.title = "ThoughtCapture Settings"
@@ -255,7 +255,7 @@ class ResultBubble {
         root.addSubview(vaultRow)
 
         let vpField = NSTextField(frame: NSMakeRect(0, 2, fw - 66, 22))
-        vpField.placeholderString = "Choose folder to save thoughts…"
+        vpField.placeholderString = "e.g. ~/obsidian-vault/01_daily"
         vpField.font = .systemFont(ofSize: 12)
         vpField.identifier = NSUserInterfaceItemIdentifier("vaultPath")
         vpField.bezelStyle = .roundedBezel
@@ -267,7 +267,9 @@ class ResultBubble {
         browseBtn.font = .systemFont(ofSize: 11)
         browseBtn.frame = NSMakeRect(fw - 62, 1, 62, 22)
         vaultRow.addSubview(browseBtn)
-        y -= 30
+        y -= 28
+
+        hint("Saves to: folder / 2026-06-29 / Thoughts.md", at: &y)
 
         class BrowseHandler: NSObject {
             weak var pathField: NSTextField?
@@ -310,11 +312,18 @@ class ResultBubble {
         storageSeg.action = #selector(StorageToggle.changed(_:))
         settingsTargets.append(storageToggle)
 
-        // ━━━━━  QUICK Q&A  ━━━━━
+        // ━━━━━  / AI Q&A  ━━━━━
         sep(at: &y)
-        sectionTitle("QUICK Q&A  (DeepSeek)", at: &y)
+        sectionTitle("/ AI QUICK ANSWER", at: &y)
 
-        let apiLabel = NSTextField(labelWithString: "API Key")
+        let qaDesc = NSTextField(labelWithString: "Type / then your question to get an AI answer instantly.")
+        qaDesc.font = .systemFont(ofSize: 11)
+        qaDesc.textColor = .secondaryLabelColor
+        qaDesc.frame = NSMakeRect(px, y - 14, fw, 14)
+        root.addSubview(qaDesc)
+        y -= 22
+
+        let apiLabel = NSTextField(labelWithString: "DeepSeek API Key")
         apiLabel.font = .systemFont(ofSize: 12)
         apiLabel.textColor = .secondaryLabelColor
         apiLabel.frame = NSMakeRect(px, y - 16, fw, 16)

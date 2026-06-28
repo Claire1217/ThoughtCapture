@@ -80,10 +80,11 @@ class LocalStorage {
         tf.dateFormat = "HH:mm"
         let timeStr = tf.string(from: Date())
 
-        try? fm.createDirectory(atPath: folder, withIntermediateDirectories: true)
-        let fileName = "Thoughts \(dateStr).md"
-        let filePath = "\(folder)/\(fileName)"
-        let savedTo = fileName
+        let dayDir = "\(folder)/\(dateStr)"
+        try? fm.createDirectory(atPath: dayDir, withIntermediateDirectories: true)
+        let fileName = "Thoughts.md"
+        let filePath = "\(dayDir)/\(fileName)"
+        let savedTo = "\(dateStr)/\(fileName)"
 
         var source = ""
         if !browserURL.isEmpty, !browserURL.hasPrefix("app://"),
@@ -98,7 +99,7 @@ class LocalStorage {
             let ts = DateFormatter()
             ts.dateFormat = "yyyyMMdd_HHmmss"
             screenshotFilename = "tc_\(ts.string(from: Date())).png"
-            let attachDir = "\(folder)/attachments"
+            let attachDir = "\(dayDir)/attachments"
             try? fm.createDirectory(atPath: attachDir, withIntermediateDirectories: true)
             fm.createFile(atPath: "\(attachDir)/\(screenshotFilename!)", contents: data)
             try? fm.removeItem(atPath: path)
