@@ -1,121 +1,6 @@
 import Cocoa
 import Carbon
 
-// MARK: - Hotkey Recorder
-
-class HotkeyRecorder: NSView {
-    let defaultsKey: String
-    var keyCode: UInt32
-    var modifiers: UInt32
-    private var recording = false
-    private var label: NSTextField!
-    private var monitor: Any?
-
-    private static let codeToName: [UInt32: String] = [
-        0:"A",1:"S",2:"D",3:"F",4:"H",5:"G",6:"Z",7:"X",8:"C",9:"V",
-        11:"B",12:"Q",13:"W",14:"E",15:"R",16:"Y",17:"T",18:"1",19:"2",
-        20:"3",21:"4",22:"6",23:"5",24:"=",25:"9",26:"7",27:"-",28:"8",
-        29:"0",31:"O",32:"U",34:"I",35:"P",37:"L",38:"J",40:"K",45:"N",46:"M",
-        47:".",44:"/",49:"Space",36:"Return",48:"Tab",51:"Delete",53:"Esc",
-        122:"F1",120:"F2",99:"F3",118:"F4",96:"F5",97:"F6",98:"F7",
-        100:"F8",101:"F9",109:"F10",103:"F11",111:"F12"
-    ]
-
-    init(defaultsKey: String, defaultCode: UInt32, defaultMods: UInt32) {
-        self.defaultsKey = defaultsKey
-        self.keyCode = UserDefaults.standard.object(forKey: defaultsKey) as? UInt32 ?? defaultCode
-        self.modifiers = UserDefaults.standard.object(forKey: defaultsKey + "Mods") as? UInt32 ?? defaultMods
-        super.init(frame: .zero)
-        setupUI()
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    private func setupUI() {
-        wantsLayer = true
-        layer?.cornerRadius = 6
-        layer?.borderWidth = 1
-        layer?.borderColor = NSColor.separatorColor.cgColor
-        layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
-
-        label = NSTextField(labelWithString: displayString())
-        label.font = .systemFont(ofSize: 12)
-        label.alignment = .center
-        label.textColor = .labelColor
-        label.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(label)
-        NSLayoutConstraint.activate([
-            label.centerXAnchor.constraint(equalTo: centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: centerYAnchor),
-        ])
-    }
-
-    private func displayString() -> String {
-        var parts: [String] = []
-        if modifiers & UInt32(controlKey) != 0 { parts.append("⌃") }
-        if modifiers & UInt32(optionKey) != 0 { parts.append("⌥") }
-        if modifiers & UInt32(shiftKey) != 0 { parts.append("⇧") }
-        if modifiers & UInt32(cmdKey) != 0 { parts.append("⌘") }
-        parts.append(Self.codeToName[keyCode] ?? "?")
-        return parts.joined()
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        startRecording()
-    }
-
-    private func startRecording() {
-        recording = true
-        label.stringValue = "Press shortcut…"
-        label.textColor = .systemOrange
-        layer?.borderColor = NSColor.systemOrange.cgColor
-
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleKey(event)
-            return nil
-        }
-        window?.makeFirstResponder(self)
-    }
-
-    override var acceptsFirstResponder: Bool { true }
-
-    override func keyDown(with event: NSEvent) {
-        if recording { handleKey(event) }
-    }
-
-    private func handleKey(_ event: NSEvent) {
-        guard recording else { return }
-        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-
-        // Need at least one modifier
-        guard flags.contains(.option) || flags.contains(.command) ||
-              flags.contains(.control) || flags.contains(.shift) else { return }
-
-        var mods: UInt32 = 0
-        if flags.contains(.control) { mods |= UInt32(controlKey) }
-        if flags.contains(.option) { mods |= UInt32(optionKey) }
-        if flags.contains(.shift) { mods |= UInt32(shiftKey) }
-        if flags.contains(.command) { mods |= UInt32(cmdKey) }
-
-        keyCode = UInt32(event.keyCode)
-        modifiers = mods
-        stopRecording()
-    }
-
-    private func stopRecording() {
-        recording = false
-        if let m = monitor { NSEvent.removeMonitor(m); monitor = nil }
-        label.stringValue = displayString()
-        label.textColor = .labelColor
-        layer?.borderColor = NSColor.separatorColor.cgColor
-    }
-
-    func save() {
-        UserDefaults.standard.set(keyCode, forKey: defaultsKey)
-        UserDefaults.standard.set(modifiers, forKey: defaultsKey + "Mods")
-    }
-}
-
 struct ResultItem {
     let id: Int
     let text: String
@@ -299,7 +184,7 @@ class ResultBubble {
         }
         settingsTargets.removeAll()
 
-        let W: CGFloat = 400, H: CGFloat = 480
+        let W: CGFloat = 400, H: CGFloat = 510
         let win = NSWindow(contentRect: NSMakeRect(0, 0, W, H),
                            styleMask: [.titled, .closable], backing: .buffered, defer: false)
         win.title = "ThoughtCapture Settings"
@@ -484,30 +369,82 @@ class ResultBubble {
         sep(at: &y)
         sectionTitle("HOTKEYS", at: &y)
 
+        let modLabels = ["⌥ Option", "⌘ Command", "⌃ Control", "⇧ Shift"]
+        let modValues: [UInt32] = [UInt32(optionKey), UInt32(cmdKey), UInt32(controlKey), UInt32(shiftKey)]
+        let keyLabels = ["A","B","C","D","E","F","G","H","I","J","K","L","M",
+                         "N","O","P","Q","R","S","T","U","V","W","X","Y","Z"]
+        let keyCodes: [String: UInt32] = [
+            "A":0,"B":11,"C":8,"D":2,"E":14,"F":3,"G":5,"H":4,"I":34,"J":38,
+            "K":40,"L":37,"M":46,"N":45,"O":31,"P":35,"Q":12,"R":15,"S":1,
+            "T":17,"U":32,"V":9,"W":13,"X":7,"Y":16,"Z":6
+        ]
+        func keyForCode(_ code: UInt32) -> String {
+            keyCodes.first(where: { $0.value == code })?.key ?? "T"
+        }
+        func modIndex(_ mods: UInt32) -> Int {
+            modValues.firstIndex(of: mods) ?? 0
+        }
+
+        let curCapKey = UserDefaults.standard.object(forKey: "hotkeyCapture") as? UInt32 ?? 17
+        let curCapMod = UserDefaults.standard.object(forKey: "hotkeyCaptureMods") as? UInt32 ?? UInt32(optionKey)
+        let curSSKey = UserDefaults.standard.object(forKey: "hotkeyScreenshot") as? UInt32 ?? 15
+        let curSSMod = UserDefaults.standard.object(forKey: "hotkeyScreenshotMods") as? UInt32 ?? UInt32(optionKey)
+
+        // Capture row
         let capLabel = NSTextField(labelWithString: "Capture:")
         capLabel.font = .systemFont(ofSize: 12)
         capLabel.textColor = .secondaryLabelColor
-        capLabel.frame = NSMakeRect(px, y - 22, 80, 20)
+        capLabel.frame = NSMakeRect(px, y - 22, 62, 20)
         root.addSubview(capLabel)
 
-        let capRecorder = HotkeyRecorder(defaultsKey: "hotkeyCapture", defaultCode: 17, defaultMods: UInt32(optionKey))
-        capRecorder.frame = NSMakeRect(px + 82, y - 24, 120, 24)
-        root.addSubview(capRecorder)
-        settingsTargets.append(capRecorder)
+        let capModPop = NSPopUpButton(frame: NSMakeRect(px + 64, y - 24, 120, 24))
+        capModPop.addItems(withTitles: modLabels)
+        capModPop.selectItem(at: modIndex(curCapMod))
+        capModPop.font = .systemFont(ofSize: 12)
+        capModPop.identifier = NSUserInterfaceItemIdentifier("capMod")
+        root.addSubview(capModPop)
 
+        let plusLabel1 = NSTextField(labelWithString: "+")
+        plusLabel1.font = .systemFont(ofSize: 13, weight: .medium)
+        plusLabel1.textColor = .secondaryLabelColor
+        plusLabel1.frame = NSMakeRect(px + 186, y - 20, 14, 16)
+        root.addSubview(plusLabel1)
+
+        let capKeyPop = NSPopUpButton(frame: NSMakeRect(px + 200, y - 24, 60, 24))
+        capKeyPop.addItems(withTitles: keyLabels)
+        capKeyPop.selectItem(withTitle: keyForCode(curCapKey))
+        capKeyPop.font = .systemFont(ofSize: 12)
+        capKeyPop.identifier = NSUserInterfaceItemIdentifier("capKey")
+        root.addSubview(capKeyPop)
+        y -= 32
+
+        // Screenshot row
         let ssLabel = NSTextField(labelWithString: "Screenshot:")
         ssLabel.font = .systemFont(ofSize: 12)
         ssLabel.textColor = .secondaryLabelColor
-        ssLabel.frame = NSMakeRect(px + 220, y - 22, 80, 20)
+        ssLabel.frame = NSMakeRect(px, y - 22, 62, 20)
         root.addSubview(ssLabel)
 
-        let ssRecorder = HotkeyRecorder(defaultsKey: "hotkeyScreenshot", defaultCode: 15, defaultMods: UInt32(optionKey))
-        ssRecorder.frame = NSMakeRect(px + 302, y - 24, 120, 24)
-        root.addSubview(ssRecorder)
-        settingsTargets.append(ssRecorder)
-        y -= 32
+        let ssModPop = NSPopUpButton(frame: NSMakeRect(px + 64, y - 24, 120, 24))
+        ssModPop.addItems(withTitles: modLabels)
+        ssModPop.selectItem(at: modIndex(curSSMod))
+        ssModPop.font = .systemFont(ofSize: 12)
+        ssModPop.identifier = NSUserInterfaceItemIdentifier("ssMod")
+        root.addSubview(ssModPop)
 
-        hint("Click to record, then press your shortcut", at: &y)
+        let plusLabel2 = NSTextField(labelWithString: "+")
+        plusLabel2.font = .systemFont(ofSize: 13, weight: .medium)
+        plusLabel2.textColor = .secondaryLabelColor
+        plusLabel2.frame = NSMakeRect(px + 186, y - 20, 14, 16)
+        root.addSubview(plusLabel2)
+
+        let ssKeyPop = NSPopUpButton(frame: NSMakeRect(px + 200, y - 24, 60, 24))
+        ssKeyPop.addItems(withTitles: keyLabels)
+        ssKeyPop.selectItem(withTitle: keyForCode(curSSKey))
+        ssKeyPop.font = .systemFont(ofSize: 12)
+        ssKeyPop.identifier = NSUserInterfaceItemIdentifier("ssKey")
+        root.addSubview(ssKeyPop)
+        y -= 32
 
         // ━━━━━  ABOUT  ━━━━━
         sep(at: &y)
@@ -573,16 +510,43 @@ class ResultBubble {
                     UserDefaults.standard.set(vaultName, forKey: "vaultName")
                 }
 
-                // Save hotkeys from recorders
-                func findRecorders(in view: NSView) -> [HotkeyRecorder] {
-                    var result: [HotkeyRecorder] = []
+                // Save hotkeys from dropdowns
+                let modVals: [UInt32] = [UInt32(optionKey), UInt32(cmdKey), UInt32(controlKey), UInt32(shiftKey)]
+                let keyMap: [String: UInt32] = [
+                    "A":0,"B":11,"C":8,"D":2,"E":14,"F":3,"G":5,"H":4,"I":34,"J":38,
+                    "K":40,"L":37,"M":46,"N":45,"O":31,"P":35,"Q":12,"R":15,"S":1,
+                    "T":17,"U":32,"V":9,"W":13,"X":7,"Y":16,"Z":6
+                ]
+                func popupIndex(in view: NSView, id: String) -> Int {
                     for sub in view.subviews {
-                        if let r = sub as? HotkeyRecorder { result.append(r) }
-                        result.append(contentsOf: findRecorders(in: sub))
+                        if let pop = sub as? NSPopUpButton, pop.identifier?.rawValue == id {
+                            return pop.indexOfSelectedItem
+                        }
+                        let found = popupIndex(in: sub, id: id)
+                        if found >= 0 { return found }
                     }
-                    return result
+                    return -1
                 }
-                for recorder in findRecorders(in: root) { recorder.save() }
+                func popupTitle(in view: NSView, id: String) -> String? {
+                    for sub in view.subviews {
+                        if let pop = sub as? NSPopUpButton, pop.identifier?.rawValue == id {
+                            return pop.titleOfSelectedItem
+                        }
+                        if let found = popupTitle(in: sub, id: id) { return found }
+                    }
+                    return nil
+                }
+
+                let capModIdx = popupIndex(in: root, id: "capMod")
+                if capModIdx >= 0 { UserDefaults.standard.set(modVals[capModIdx], forKey: "hotkeyCaptureMods") }
+                if let k = popupTitle(in: root, id: "capKey"), let code = keyMap[k] {
+                    UserDefaults.standard.set(code, forKey: "hotkeyCapture")
+                }
+                let ssModIdx = popupIndex(in: root, id: "ssMod")
+                if ssModIdx >= 0 { UserDefaults.standard.set(modVals[ssModIdx], forKey: "hotkeyScreenshotMods") }
+                if let k = popupTitle(in: root, id: "ssKey"), let code = keyMap[k] {
+                    UserDefaults.standard.set(code, forKey: "hotkeyScreenshot")
+                }
                 if let delegate = NSApp.delegate as? AppDelegate {
                     delegate.registerHotkey()
                 }
