@@ -217,8 +217,10 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
         // Command mode visual feedback
         let text = tv.string
         let isCmd = text.hasPrefix("/") || text.hasPrefix("／")
+                    || text.lowercased().hasPrefix("@claude")
+        let isAtClaude = text.lowercased().hasPrefix("@claude")
         if isCmd {
-            hintLabel?.stringValue = "↵ ask AI · esc"
+            hintLabel?.stringValue = isAtClaude ? "↵ @claude · esc" : "↵ ask AI · esc"
             hintLabel?.textColor = aiColor
             if !isAIMode {
                 isAIMode = true
@@ -234,10 +236,11 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
                 let full = NSMutableAttributedString(attributedString: tv.attributedString())
                 let range = NSRange(location: 0, length: full.length)
                 full.addAttribute(.foregroundColor, value: aiColor, range: range)
-                if full.length >= 1 {
-                    let slashRange = NSRange(location: 0, length: 1)
-                    full.addAttribute(.font, value: NSFont.systemFont(ofSize: 13, weight: .bold), range: slashRange)
-                    full.addAttribute(.kern, value: 3, range: slashRange)
+                let prefixLen = isAtClaude ? min(7, full.length) : min(1, full.length)
+                if prefixLen > 0 {
+                    let prefixRange = NSRange(location: 0, length: prefixLen)
+                    full.addAttribute(.font, value: NSFont.systemFont(ofSize: 13, weight: .bold), range: prefixRange)
+                    full.addAttribute(.kern, value: isAtClaude ? 1 : 3, range: prefixRange)
                 }
                 tv.textStorage?.setAttributedString(full)
                 updatingStyle = false
