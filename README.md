@@ -76,7 +76,7 @@ your-folder/
 
 ## Obsidian Styling
 
-The custom callout styles (colored thought cards with sparkle icon) are **installed automatically** when you save Settings with the Obsidian backend. Restart Obsidian to see the change.
+The custom callout styles (colored thought cards with sparkle icon) are **installed automatically** when you save Settings with the Obsidian backend. If Obsidian is already open, close and reopen it to load the new snippet.
 
 If you prefer to install manually: copy `thought-cards.css` to `.obsidian/snippets/`, then enable it in Obsidian Settings → Appearance → CSS snippets.
 
