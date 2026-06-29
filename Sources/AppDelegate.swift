@@ -82,8 +82,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let editable = self.lastSelectionEditable
 
             if self.capturePanel == nil { self.capturePanel = CapturePanel() }
-            self.capturePanel?.show(selectedText: text, anchorPoint: pos,
-                                    browserURL: browserURL) { [weak self] thought in
+            self.capturePanel?.show(selectedText: text, anchorPoint: pos) { [weak self] thought in
                 self?.sendToServer(thought: thought, selectedText: text,
                                    appName: appName, windowTitle: windowTitle,
                                    browserURL: browserURL, editable: editable)
@@ -165,8 +164,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let browserURL = getBrowserURL(appName: appName)
 
         if capturePanel == nil { capturePanel = CapturePanel() }
-        capturePanel?.show(selectedText: selectedText, anchorPoint: mousePos,
-                           browserURL: browserURL) { [weak self] thought in
+        capturePanel?.show(selectedText: selectedText, anchorPoint: mousePos) { [weak self] thought in
             self?.sendToServer(thought: thought, selectedText: selectedText,
                                appName: appName, windowTitle: windowTitle, browserURL: browserURL,
                                editable: editable)
@@ -211,7 +209,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let mousePos = NSEvent.mouseLocation
                 if self?.capturePanel == nil { self?.capturePanel = CapturePanel() }
                 self?.capturePanel?.show(selectedText: "", anchorPoint: mousePos,
-                                        screenshotPath: tmpPath, browserURL: browserURL) { thought in
+                                        screenshotPath: tmpPath) { thought in
                     self?.sendToServer(thought: thought, selectedText: "",
                                        appName: appName, windowTitle: windowTitle,
                                        browserURL: browserURL, screenshotPath: tmpPath)

@@ -28,8 +28,6 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
     private var quotedText = ""
     private var hasScreenshot = false
     private var screenshotView: NSImageView?
-    private var sourceURL = ""
-    private var sourceLabel: NSTextField?
     private var anchorY: CGFloat = 0
     private var isAIMode = false
     private let aiColor = NSColor(red: 0.55, green: 0.36, blue: 0.85, alpha: 1)
@@ -41,7 +39,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
     private var streamTimer: Timer?
 
     func show(selectedText: String, anchorPoint: NSPoint,
-              screenshotPath: String? = nil, browserURL: String = "",
+              screenshotPath: String? = nil,
               completion: @escaping (String) -> Void) {
         onSubmit = completion
         close()
@@ -50,12 +48,9 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
         hasQuote = !selectedText.isEmpty
         quotedText = selectedText
         hasScreenshot = screenshotPath != nil
-        sourceURL = browserURL
         let thumbH: CGFloat = hasScreenshot ? 140 : 0
-        let hasSource = !sourceURL.isEmpty
         quoteOffsetFromTop = 36
-        let sourceH: CGFloat = hasSource ? 18 : 0
-        topRegionH = (hasQuote ? 46 : 10) + sourceH
+        topRegionH = hasQuote ? 46 : 10
         let ph: CGFloat = topRegionH + baseInputH + 14 + thumbH
         anchorY = anchorPoint.y
 
@@ -126,19 +121,6 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
         }
 
         // Source URL indicator
-        if hasSource, let parsed = URL(string: sourceURL) {
-            let host = parsed.host ?? sourceURL
-            let display = "🔗 \(host)"
-            let srcY = hasQuote ? (ph - quoteOffsetFromTop - sourceH - 4) : (ph - 10 - 14)
-            let srcLabel = NSTextField(labelWithString: display)
-            srcLabel.font = NSFont.systemFont(ofSize: 10)
-            srcLabel.textColor = NSColor(red: 0.45, green: 0.55, blue: 0.75, alpha: 1)
-            srcLabel.lineBreakMode = .byTruncatingTail
-            srcLabel.frame = NSMakeRect(16, srcY, pw - 32, 14)
-            c.addSubview(srcLabel)
-            sourceLabel = srcLabel
-        }
-
         // NSTextView in NSScrollView for auto-wrapping input
         let inputY: CGFloat = 14
         let sv = NSScrollView(frame: NSMakeRect(10, inputY, pw - 24, baseInputH))
@@ -531,7 +513,6 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
         panel?.close(); panel = nil
         screenshotView = nil
         ctxBoxView = nil
-        sourceLabel = nil
         isAIMode = false
         if let m = escMonitor { NSEvent.removeMonitor(m); escMonitor = nil }
         if let m = clickMonitor { NSEvent.removeMonitor(m); clickMonitor = nil }
