@@ -4,6 +4,8 @@
 __pycache__/
 
 # Build artifacts
+Eureka
+Eureka.app/
 ThoughtCapture
 ThoughtCapture.app/
 ThoughtCaptureHotkey

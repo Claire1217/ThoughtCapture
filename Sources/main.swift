@@ -1,9 +1,9 @@
 import Cocoa
 
 let myPID = ProcessInfo.processInfo.processIdentifier
-let running = NSRunningApplication.runningApplications(withBundleIdentifier: "com.thoughtcapture.app")
+let running = NSRunningApplication.runningApplications(withBundleIdentifier: "com.eureka.app")
 if running.contains(where: { $0.processIdentifier != myPID }) {
-    fputs("[TC] Another instance is already running. Exiting.\n", stderr)
+    fputs("[Eureka] Another instance is already running. Exiting.\n", stderr)
     exit(0)
 }
 

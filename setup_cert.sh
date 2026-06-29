@@ -1,12 +1,11 @@
 #!/bin/bash
 # Developer-only: create a self-signed code signing certificate
-# so ThoughtCapture's Accessibility permission survives rebuilds.
+# so Eureka's Accessibility permission survives rebuilds.
 # NOT needed for end users — just run deploy.sh instead.
 set -e
 
-CERT_NAME="ThoughtCapture Dev"
+CERT_NAME="Eureka Dev"
 
-# Check if already exists
 if security find-identity -v -p codesigning 2>/dev/null | grep -q "$CERT_NAME"; then
     echo "✓ Certificate '$CERT_NAME' already exists."
     security find-identity -v -p codesigning 2>/dev/null | grep "$CERT_NAME"
@@ -25,7 +24,7 @@ x509_extensions = codesign_ext
 prompt = no
 
 [req_dn]
-CN = ThoughtCapture Dev
+CN = Eureka Dev
 
 [codesign_ext]
 keyUsage = critical, digitalSignature
@@ -33,7 +32,6 @@ extendedKeyUsage = critical, codeSigning
 basicConstraints = critical, CA:false
 EOF
 
-# Generate key + cert
 echo "Generating certificate..."
 openssl req -x509 -newkey rsa:2048 \
     -keyout "$TMPDIR/key.pem" -out "$TMPDIR/cert.pem" \
@@ -42,7 +40,6 @@ openssl req -x509 -newkey rsa:2048 \
     exit 1
 }
 
-# Create p12 — try with -legacy first (OpenSSL 3.x), fall back without (LibreSSL/OpenSSL 1.x)
 echo "Creating PKCS12 bundle..."
 if ! openssl pkcs12 -export -out "$TMPDIR/tc.p12" \
     -inkey "$TMPDIR/key.pem" -in "$TMPDIR/cert.pem" \
@@ -55,7 +52,6 @@ if ! openssl pkcs12 -export -out "$TMPDIR/tc.p12" \
     }
 fi
 
-# Import to login keychain
 echo "Importing to login keychain..."
 security import "$TMPDIR/tc.p12" -k ~/Library/Keychains/login.keychain-db \
     -P tc123 -T /usr/bin/codesign || {
@@ -63,7 +59,6 @@ security import "$TMPDIR/tc.p12" -k ~/Library/Keychains/login.keychain-db \
     exit 1
 }
 
-# Trust the certificate (will prompt for password)
 echo "Trusting certificate (enter your password if prompted)..."
 security add-trusted-cert -d -r trustRoot \
     -k ~/Library/Keychains/login.keychain-db "$TMPDIR/cert.pem" || {
@@ -71,7 +66,6 @@ security add-trusted-cert -d -r trustRoot \
     exit 1
 }
 
-# Verify
 if security find-identity -v -p codesigning 2>/dev/null | grep -q "$CERT_NAME"; then
     echo ""
     echo "✓ Certificate created and trusted."

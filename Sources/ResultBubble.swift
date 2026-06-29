@@ -187,7 +187,7 @@ class ResultBubble {
         let W: CGFloat = 420, H: CGFloat = 500
         let win = NSWindow(contentRect: NSMakeRect(0, 0, W, H),
                            styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        win.title = "ThoughtCapture Settings"
+        win.title = "Eureka Settings"
         win.center()
         win.isReleasedWhenClosed = false
 
@@ -659,7 +659,7 @@ class ResultBubble {
         if let bubble = dotWin.contentView as? ThoughtBubbleView {
             bubbleColor = bubble.currentColor
         } else {
-            bubbleColor = TC.green
+            bubbleColor = EU.green
         }
 
         let item = ResultItem(id: nextId, text: text, savedTo: savedTo,
@@ -690,7 +690,7 @@ class ResultBubble {
             container.frame = NSMakeRect(0, 0, popWidth, emptyH)
             let hint = NSTextField(labelWithString: "Press \(captureHotkeyLabel) to capture a thought")
             hint.font = rounded(size: 12)
-            hint.textColor = TC.muted
+            hint.textColor = EU.muted
             hint.alignment = .center
             hint.frame = NSMakeRect(10, (emptyH - 16) / 2, popWidth - 20, 16)
             container.addSubview(hint)
@@ -712,7 +712,7 @@ class ResultBubble {
             y -= 16
             let header = NSTextField(labelWithString: "THOUGHTS")
             header.font = rounded(size: 9, weight: .medium)
-            header.textColor = TC.muted
+            header.textColor = EU.muted
             header.frame = NSMakeRect(10, y + 1, popWidth - 20, 13)
             container.addSubview(header)
 
@@ -731,13 +731,13 @@ class ResultBubble {
                 let dot = NSView(frame: NSMakeRect(8, (rowH - 6) / 2, 6, 6))
                 dot.wantsLayer = true
                 dot.layer?.cornerRadius = 3
-                dot.layer?.backgroundColor = (item.ok ? item.color : TC.red).cgColor
+                dot.layer?.backgroundColor = (item.ok ? item.color : EU.red).cgColor
                 row.addSubview(dot)
 
                 // Text
                 let label = NSTextField(labelWithString: item.text)
                 label.font = rounded(size: 12)
-                label.textColor = TC.text
+                label.textColor = EU.text
                 label.lineBreakMode = .byTruncatingTail
                 label.frame = NSMakeRect(22, (rowH - 14) / 2, popWidth - 76, 14)
                 row.addSubview(label)
@@ -745,7 +745,7 @@ class ResultBubble {
                 // Time
                 let time = NSTextField(labelWithString: item.time)
                 time.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
-                time.textColor = TC.faint
+                time.textColor = EU.faint
                 time.alignment = .right
                 time.frame = NSMakeRect(popWidth - 54, (rowH - 12) / 2, 36, 12)
                 row.addSubview(time)

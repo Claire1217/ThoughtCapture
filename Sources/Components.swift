@@ -83,7 +83,7 @@ class ThoughtBubbleView: TrackView {
         settingsItem.target = self
         menu.addItem(settingsItem)
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Quit ThoughtCapture",
+        menu.addItem(NSMenuItem(title: "Quit Eureka",
                                 action: #selector(NSApplication.terminate(_:)),
                                 keyEquivalent: ""))
         NSMenu.popUpContextMenu(menu, with: event, for: self)

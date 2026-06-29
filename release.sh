@@ -1,15 +1,14 @@
 #!/bin/bash
-# Build ThoughtCapture.app and package as .zip for GitHub release
+# Build Eureka.app and package as .zip for GitHub release
 set -e
 cd "$(dirname "$0")"
 
-VERSION="${1:-1.0.0}"
-APP="ThoughtCapture.app"
-BINARY="$APP/Contents/MacOS/ThoughtCapture"
+VERSION="${1:-2.0.0}"
+APP="Eureka.app"
+BINARY="$APP/Contents/MacOS/Eureka"
 
-echo "=== Building ThoughtCapture v$VERSION ==="
+echo "=== Building Eureka v$VERSION ==="
 
-# Create app bundle
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cat > "$APP/Contents/Info.plist" << EOF
@@ -19,11 +18,11 @@ cat > "$APP/Contents/Info.plist" << EOF
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.thoughtcapture.app</string>
+    <string>com.eureka.app</string>
     <key>CFBundleName</key>
-    <string>ThoughtCapture</string>
+    <string>Eureka</string>
     <key>CFBundleExecutable</key>
-    <string>ThoughtCapture</string>
+    <string>Eureka</string>
     <key>CFBundleVersion</key>
     <string>$VERSION</string>
     <key>CFBundleShortVersionString</key>
@@ -31,7 +30,7 @@ cat > "$APP/Contents/Info.plist" << EOF
     <key>LSUIElement</key>
     <true/>
     <key>NSAppleEventsUsageDescription</key>
-    <string>ThoughtCapture needs Automation access to save thoughts to Apple Notes.</string>
+    <string>Eureka needs Automation access to save thoughts to Apple Notes.</string>
 </dict>
 </plist>
 EOF
@@ -52,12 +51,10 @@ echo "Signing..."
 codesign --force --sign - "$APP"
 
 echo "Packaging..."
-rm -f "ThoughtCapture-v${VERSION}.zip"
-ditto -c -k --sequesterRsrc --keepParent "$APP" "ThoughtCapture-v${VERSION}.zip"
+rm -f "Eureka-v${VERSION}.zip"
+ditto -c -k --sequesterRsrc --keepParent "$APP" "Eureka-v${VERSION}.zip"
 
-SIZE=$(du -h "ThoughtCapture-v${VERSION}.zip" | cut -f1)
+SIZE=$(du -h "Eureka-v${VERSION}.zip" | cut -f1)
 echo ""
 echo "=== Done ==="
-echo "  ThoughtCapture-v${VERSION}.zip ($SIZE)"
-echo ""
-echo "Upload to GitHub: gh release create v${VERSION} ThoughtCapture-v${VERSION}.zip --title 'v${VERSION}' --notes 'Initial release'"
+echo "  Eureka-v${VERSION}.zip ($SIZE)"

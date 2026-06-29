@@ -1,22 +1,20 @@
 #!/bin/bash
-# Developer build: uses persistent "ThoughtCapture Dev" certificate
+# Developer build: uses persistent "Eureka Dev" certificate
 # so Accessibility permission survives across rebuilds.
 # Run setup_cert.sh first to create the certificate.
 set -e
 cd "$(dirname "$0")"
 
-APP="ThoughtCapture.app"
-BINARY="$APP/Contents/MacOS/ThoughtCapture"
-SIGNING_ID="ThoughtCapture Dev"
+APP="Eureka.app"
+BINARY="$APP/Contents/MacOS/Eureka"
+SIGNING_ID="Eureka Dev"
 
-# Verify signing identity exists
 if ! security find-identity -v -p codesigning 2>/dev/null | grep -q "$SIGNING_ID"; then
     echo "ERROR: Signing identity '$SIGNING_ID' not found."
     echo "Run ./setup_cert.sh first to create the code signing certificate."
     exit 1
 fi
 
-# Create app bundle structure
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cat > "$APP/Contents/Info.plist" << 'EOF'
@@ -26,17 +24,17 @@ cat > "$APP/Contents/Info.plist" << 'EOF'
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.thoughtcapture.app</string>
+    <string>com.eureka.app</string>
     <key>CFBundleName</key>
-    <string>ThoughtCapture</string>
+    <string>Eureka</string>
     <key>CFBundleExecutable</key>
-    <string>ThoughtCapture</string>
+    <string>Eureka</string>
     <key>CFBundleVersion</key>
     <string>1.0</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSAppleEventsUsageDescription</key>
-    <string>ThoughtCapture needs Automation access to save thoughts to Apple Notes.</string>
+    <string>Eureka needs Automation access to save thoughts to Apple Notes.</string>
 </dict>
 </plist>
 EOF

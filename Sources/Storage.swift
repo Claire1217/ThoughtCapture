@@ -172,7 +172,7 @@ class LocalStorage {
     }
 
     private let thoughtCardsCSS = """
-    /* ThoughtCapture — styled thought callouts */
+    /* Eureka — styled thought callouts */
     .callout[data-callout^="thought"] {
       --callout-icon: lucide-sparkles;
       border: none; border-radius: 10px; padding: 8px 14px;
@@ -239,7 +239,7 @@ class LocalStorage {
             proc.waitUntilExit()
             return (proc.terminationStatus == 0, noteTitle)
         } catch {
-            fputs("[TC] Apple Notes error: \(error)\n", stderr)
+            fputs("[Eureka] Apple Notes error: \(error)\n", stderr)
             return (false, "")
         }
     }

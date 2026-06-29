@@ -33,7 +33,7 @@ var screenshotHotkeyLabel: String {
 
 let THOUGHT_COLORS = ["coral", "blue", "purple", "green", "amber", "olive", "pink", "steel"]
 
-struct TC {
+struct EU {
     static let green  = NSColor(red: 0.13, green: 0.77, blue: 0.37, alpha: 1)
     static let red    = NSColor(red: 0.94, green: 0.27, blue: 0.27, alpha: 1)
     static let primary = NSColor(white: 0.06, alpha: 1)

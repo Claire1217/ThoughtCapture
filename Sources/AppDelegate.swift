@@ -12,7 +12,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
         let trusted = AXIsProcessTrustedWithOptions(opts)
-        fputs("[TC] AX trusted on launch: \(trusted)\n", stderr)
+        fputs("[Eureka] AX trusted on launch: \(trusted)\n", stderr)
 
         setupMenubar()
         registerHotkey()
@@ -27,7 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func showFirstLaunchSetup() {
         let alert = NSAlert()
-        alert.messageText = "Welcome to ThoughtCapture"
+        alert.messageText = "Welcome to Eureka"
         alert.informativeText = "Press \(captureHotkeyLabel) anywhere to capture a thought.\n\nFirst, choose where to save your thoughts:"
         alert.addButton(withTitle: "Choose Obsidian Vault…")
         alert.addButton(withTitle: "Use Apple Notes")
@@ -96,7 +96,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func setupMenubar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.title = "TC"
+        statusItem.button?.title = "E!"
 
         let menu = NSMenu()
         let captureItem = NSMenuItem(title: "Capture Thought (\(captureHotkeyLabel))",
@@ -223,7 +223,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var lastSelectionEditable: Bool = false
 
     func getSelectedText() -> String {
-        func dbg(_ msg: String) { fputs("[TC] \(msg)\n", stderr) }
+        func dbg(_ msg: String) { fputs("[Eureka] \(msg)\n", stderr) }
 
         let trusted = AXIsProcessTrusted()
         lastSelectionEditable = false
@@ -335,7 +335,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if done.wait(timeout: deadline) == .timedOut {
             proc.terminate()
-            fputs("[TC] osascript timed out\n", stderr)
+            fputs("[Eureka] osascript timed out\n", stderr)
             return ""
         }
         return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
@@ -388,9 +388,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let model = storage.llmModel
 
         guard !apiKey.isEmpty else {
-            fputs("[TC] DeepSeek API key not set\n", stderr)
+            fputs("[Eureka] DeepSeek API key not set\n", stderr)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.capturePanel?.finishStreamWithMessage("API key 未设置\n\n右键菜单栏 TC → Settings → 填入 DeepSeek API key\n获取: platform.deepseek.com")
+                self?.capturePanel?.finishStreamWithMessage("API key 未设置\n\n右键菜单栏 E! → Settings → 填入 DeepSeek API key\n获取: platform.deepseek.com")
             }
             return
         }
@@ -471,7 +471,7 @@ class StreamingDelegate: NSObject, URLSessionDataDelegate {
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
                     self.panel?.finishStream()
-                    fputs("[TC] DeepSeek stream done: \(self.fullAnswer.prefix(80))...\n", stderr)
+                    fputs("[Eureka] DeepSeek stream done: \(self.fullAnswer.prefix(80))...\n", stderr)
                 }
                 return
             }
@@ -493,7 +493,7 @@ class StreamingDelegate: NSObject, URLSessionDataDelegate {
                     didCompleteWithError error: Error?) {
         if let err = error {
             DispatchQueue.main.async { [weak self] in
-                fputs("[TC] DeepSeek stream error: \(err.localizedDescription)\n", stderr)
+                fputs("[Eureka] DeepSeek stream error: \(err.localizedDescription)\n", stderr)
                 self?.panel?.appendStreamChunk("\n⚠️ \(err.localizedDescription)")
                 self?.panel?.finishStream()
             }

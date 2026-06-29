@@ -104,7 +104,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
 
             let ctxBox = NSView(frame: NSMakeRect(12, ctxY - 2, pw - 24, 26))
             ctxBox.wantsLayer = true
-            ctxBox.layer?.backgroundColor = TC.ctxBg.cgColor
+            ctxBox.layer?.backgroundColor = EU.ctxBg.cgColor
             ctxBox.layer?.cornerRadius = 8
             ctxBox.identifier = NSUserInterfaceItemIdentifier("ctxBox")
             c.addSubview(ctxBox)
@@ -112,7 +112,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
 
             let label = NSTextField(labelWithString: txt)
             label.font = NSFont.systemFont(ofSize: 11)
-            label.textColor = TC.muted
+            label.textColor = EU.muted
             label.lineBreakMode = .byTruncatingTail
             label.frame = NSMakeRect(20, ctxY + 2, pw - 40, 14)
             c.addSubview(label)
@@ -131,7 +131,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
 
         let tv = NSTextView(frame: NSMakeRect(0, 0, pw - 24, baseInputH))
         tv.font = NSFont.systemFont(ofSize: 13)
-        tv.textColor = TC.sub
+        tv.textColor = EU.sub
         tv.drawsBackground = false
         tv.isRichText = false
         tv.isAutomaticQuoteSubstitutionEnabled = false
@@ -152,7 +152,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
         // Placeholder
         let placeholder = NSTextField(labelWithString: "记个想法… 或 /指令 问AI")
         placeholder.font = NSFont.systemFont(ofSize: 13)
-        placeholder.textColor = TC.faint
+        placeholder.textColor = EU.faint
         placeholder.frame = NSMakeRect(14, inputY + 2, 260, 20)
         placeholder.tag = 999
         c.addSubview(placeholder)
@@ -160,7 +160,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
         // Hint
         let hint = NSTextField(labelWithString: "\u{21B5} save \u{00B7} esc")
         hint.font = NSFont.systemFont(ofSize: 10)
-        hint.textColor = TC.faint
+        hint.textColor = EU.faint
         hint.frame = NSMakeRect(pw - 80, 4, 70, 12)
         hint.alignment = .right
         c.addSubview(hint)
@@ -256,7 +256,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
         } else if isAIMode {
             isAIMode = false
             hintLabel?.stringValue = "\u{21B5} save · esc"
-            hintLabel?.textColor = TC.faint
+            hintLabel?.textColor = EU.faint
             NSAnimationContext.runAnimationGroup { ctx in
                 ctx.duration = 0.2
                 c.layer?.borderWidth = 0
@@ -265,7 +265,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
                 c.layer?.shadowRadius = 16
             }
             updatingStyle = true
-            tv.textColor = TC.sub
+            tv.textColor = EU.sub
             updatingStyle = false
         }
 
@@ -301,7 +301,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let text = typed.isEmpty ? quotedText : typed
         guard !text.isEmpty else { close(); return }
-        fputs("[TC] submit: \(text)\n", stderr)
+        fputs("[Eureka] submit: \(text)\n", stderr)
         let isAI = text.hasPrefix("/") || text.hasPrefix("／")
         if !isAI {
             close()
@@ -375,7 +375,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
             let dots = String(repeating: "·", count: (tick % 3) + 1)
             let attrs: [NSAttributedString.Key: Any] = [
                 .font: NSFont.systemFont(ofSize: 13),
-                .foregroundColor: TC.muted
+                .foregroundColor: EU.muted
             ]
             tv.textStorage?.setAttributedString(NSAttributedString(string: dots, attributes: attrs))
         }
@@ -426,7 +426,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
         paraStyle.lineSpacing = 3
         let answerAttrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 13),
-            .foregroundColor: TC.body,
+            .foregroundColor: EU.body,
             .paragraphStyle: paraStyle
         ]
         let chars = Array(text)
@@ -473,7 +473,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
             self.hintLabel?.frame = NSMakeRect(self.pw - 70, 2, 60, 12)
             self.hintLabel?.stringValue = "esc"
             self.hintLabel?.font = NSFont.systemFont(ofSize: 10)
-            self.hintLabel?.textColor = TC.faint
+            self.hintLabel?.textColor = EU.faint
 
             tv.scrollToEndOfDocument(nil)
 
@@ -488,7 +488,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
         let aiCol = NSColor(red: 0.55, green: 0.36, blue: 0.85, alpha: 1)
         let base: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 13),
-            .foregroundColor: TC.text
+            .foregroundColor: EU.text
         ]
         let result = NSMutableAttributedString(string: text, attributes: base)
         if text.hasPrefix("/") || text.hasPrefix("／") {
@@ -505,7 +505,7 @@ class CapturePanel: NSObject, NSTextStorageDelegate {
     var isOpen: Bool { panel != nil }
 
     func close() {
-        fputs("[TC] CapturePanel.close()\n", stderr)
+        fputs("[Eureka] CapturePanel.close()\n", stderr)
         dotsTimer?.invalidate(); dotsTimer = nil
         streamTimer?.invalidate(); streamTimer = nil
         answerPhase = false; answerBuffer = ""
