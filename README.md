@@ -2,7 +2,9 @@
 
 A lightweight macOS menu bar app for capturing fleeting thoughts. Press a hotkey anywhere, type your thought, and it's saved to your Obsidian vault or Apple Notes.
 
-轻量 macOS 菜单栏应用，随时随地按快捷键记录灵感，自动保存到 Obsidian 或 Apple Notes。
+一按，一写，搞定。一键从任意界面捕获屏幕与选中文本，写入 Obsidian。
+
+![Capture demo](assets/capture-demo.png)
 
 ![Obsidian demo](assets/obsidian-demo.png)
 
