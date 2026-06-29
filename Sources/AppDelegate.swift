@@ -20,8 +20,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ResultBubble.fetchConfig(sync: true)
         setupSelectionToolbar()
 
-        if LocalStorage.shared.vaultPath.isEmpty && LocalStorage.shared.backend == "obsidian" {
+        if !trusted {
+            showAccessibilityGuide()
+        } else if LocalStorage.shared.vaultPath.isEmpty && LocalStorage.shared.backend == "obsidian" {
             showFirstLaunchSetup()
+        }
+    }
+
+    func showAccessibilityGuide() {
+        let alert = NSAlert()
+        alert.messageText = "Eureka needs Accessibility permission"
+        alert.informativeText = "To capture thoughts with a global hotkey, Eureka needs Accessibility access.\n\nClick \"Open Settings\" to go there now, then enable Eureka in the list."
+        alert.addButton(withTitle: "Open Settings")
+        alert.addButton(withTitle: "Later")
+        alert.alertStyle = .informational
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            if LocalStorage.shared.vaultPath.isEmpty && LocalStorage.shared.backend == "obsidian" {
+                self?.showFirstLaunchSetup()
+            }
         }
     }
 
